@@ -1,0 +1,2509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Férias</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#12161c; --panel:#1a2028; --panel-2:#212936; --line:#2a3341;
+    --ink:#e8ecf1; --ink-dim:#8a95a5; --accent:#ff8a3d;
+    --verde:#2ecc71; --amarelo:#f4c430; --vermelho:#ff5252; --azul:#4d9eff; --roxo:#b07cff;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); min-height:100vh;}
+  header{
+    padding:20px 16px 14px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, #171c23, #12161c);
+    position:sticky; top:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:flex-start;
+  }
+  header h1{font-size:1.15rem; margin:0 0 2px; letter-spacing:.3px; display:flex; align-items:center; gap:8px;}
+  header h1 .tag{font-family:var(--mono); font-size:.62rem; color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:1px 6px; letter-spacing:.5px;}
+  header p{margin:0; color:var(--ink-dim); font-size:.78rem;}
+  .gear-btn{background:transparent; border:1px solid var(--line); color:var(--ink-dim); border-radius:8px; width:34px; height:34px; cursor:pointer; font-size:1rem; flex-shrink:0;}
+  .gear-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .user-bar{display:flex; align-items:center; gap:7px; font-size:.72rem; color:var(--ink-dim); margin-top:8px;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:var(--verde); flex-shrink:0;}
+  .logout-link{background:none; border:none; color:var(--accent); font-size:.72rem; cursor:pointer; text-decoration:underline; padding:0;}
+  .dash-cta{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+    padding:8px 11px; font-size:.72rem; font-weight:700; color:var(--ink);
+    cursor:pointer; display:flex; align-items:center; gap:6px;
+  }
+  .dash-cta:hover{border-color:var(--accent); color:var(--ink);}
+  .dash-toolbar{display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px 0;}
+  .dash-mini-chip{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+    padding:8px 11px; font-size:.72rem; font-weight:600; color:var(--ink-dim);
+    cursor:pointer; display:flex; align-items:center; gap:6px;
+  }
+  .dash-mini-chip:hover{border-color:var(--accent); color:var(--ink);}
+  .dash-mini-n{font-family:var(--mono); font-weight:700; font-size:.85rem;}
+  .dash-mini-chip.emferias .dash-mini-n{color:var(--accent);}
+  .dash-mini-chip.programada .dash-mini-n{color:var(--verde);}
+  .dash-mini-chip.aguardando .dash-mini-n{color:var(--azul);}
+  .dash-mini-chip.aprovada .dash-mini-n{color:var(--roxo);}
+
+  .pizza-linhas{display:flex; flex-direction:column; gap:12px;}
+  .pizza-linha{
+    display:flex; gap:14px; align-items:flex-start;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:14px;
+  }
+  .pizza-svg-wrap{position:relative; width:76px; height:76px; flex-shrink:0;}
+  .pizza-svg{width:100%; height:100%; transform:rotate(-90deg);}
+  .pizza-pct{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:.85rem; color:var(--ink);
+  }
+  .pizza-detalhes{flex:1; min-width:0;}
+  .pizza-titulo{font-size:.82rem; font-weight:700; color:var(--ink); margin-bottom:2px;}
+  .pizza-sub{font-size:.68rem; color:var(--ink-dim); margin-bottom:8px;}
+  .pizza-nomes{display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;}
+  .pizza-nome-chip{
+    background:var(--panel); border:1px solid var(--line); border-radius:20px;
+    padding:4px 10px; font-size:.7rem; color:var(--ink); white-space:nowrap;
+  }
+  .pizza-nome-linha{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:6px 9px; font-size:.72rem; width:100%;
+  }
+
+  .cal-header{display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-bottom:8px; max-width:340px;}
+  .cal-nav{background:var(--panel-2); border:1px solid var(--line); color:var(--ink); border-radius:7px; width:28px; height:28px; font-size:.95rem; cursor:pointer;}
+  .cal-nav:hover{border-color:var(--accent);}
+  .cal-titulo{font-weight:700; font-size:.8rem; min-width:130px; text-align:center;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:3px; max-width:340px; margin:0;}
+  .cal-dow{font-size:.56rem; color:var(--ink-dim); text-align:center; text-transform:uppercase; padding-bottom:3px;}
+  .cal-dia{
+    aspect-ratio:1; border-radius:6px; border:1px solid var(--line); background:var(--panel-2);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:.6rem; cursor:default; position:relative;
+  }
+  .cal-dia.vazio{border:none; background:none;}
+  .cal-dia.tem-gente{cursor:pointer;}
+  .cal-dia.tem-gente:hover{border-color:var(--accent);}
+  .cal-dia .cal-num{color:var(--ink-dim); font-size:.58rem;}
+  .cal-dia .cal-badge{
+    font-family:var(--mono); font-weight:700; font-size:.6rem; border-radius:20px;
+    padding:0 4px; margin-top:1px;
+  }
+  .cal-dia.hoje{border-color:var(--accent);}
+  .cal-dia.nivel-baixo .cal-badge{background:rgba(46,204,113,.18); color:var(--verde);}
+  .cal-dia.nivel-medio .cal-badge{background:rgba(244,196,48,.18); color:var(--amarelo);}
+  .cal-dia.nivel-alto .cal-badge{background:rgba(255,82,82,.18); color:var(--vermelho);}
+
+  .summary{display:flex; gap:8px; padding:12px 16px 4px; overflow-x:auto;}
+  .chip{flex:1; min-width:78px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 10px; text-align:center; cursor:pointer; transition:.15s;}
+  .chip.active{border-color:var(--accent); background:var(--panel-2);}
+  .chip .n{font-family:var(--mono); font-size:1.3rem; font-weight:700;}
+  .chip .l{font-size:.66rem; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.4px; margin-top:2px;}
+  .chip.red .n{color:var(--vermelho);} .chip.yellow .n{color:var(--amarelo);} .chip.green .n{color:var(--verde);}
+
+  .toolbar{display:flex; gap:8px; padding:12px 16px; flex-wrap:wrap;}
+  input, select, textarea{background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:9px 10px; font-family:var(--sans); font-size:.85rem;}
+  input:focus, select:focus, textarea:focus{outline:none; border-color:var(--accent);}
+  #search{flex:1; min-width:140px;}
+  .btn{border:none; border-radius:8px; padding:9px 14px; font-size:.82rem; font-weight:600; cursor:pointer; font-family:var(--sans); transition:.15s;}
+  .btn-primary{background:var(--accent); color:#1a1006;}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--ink);}
+  .btn-ghost:hover{border-color:var(--accent);}
+  .btn-sm{padding:6px 10px; font-size:.72rem;}
+
+  .threshold{display:flex; align-items:center; gap:6px; padding:0 16px 12px; color:var(--ink-dim); font-size:.78rem;}
+  .threshold select{padding:5px 8px; font-size:.78rem;}
+
+  main{padding:0 16px 100px;}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--line); border-radius:10px; padding:13px 14px; margin-bottom:10px;}
+  .card.red{border-left-color:var(--vermelho);} .card.yellow{border-left-color:var(--amarelo);} .card.green{border-left-color:var(--verde);}
+  .card.aquisicao{border-left-color:var(--ink-dim);}
+
+  .card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .card .info{flex:1; min-width:0;}
+  .card .nome{font-weight:600; font-size:.95rem; margin-bottom:3px;}
+  .card .meta{font-family:var(--mono); font-size:.72rem; color:var(--ink-dim); display:flex; flex-wrap:wrap; gap:10px; margin-top:6px;}
+  .card .meta b{color:var(--ink); font-weight:600;}
+
+  .saldo-row{display:flex; gap:10px; margin-top:9px; flex-wrap:wrap;}
+  .saldo-box{background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:7px 10px; flex:1; min-width:120px;}
+  .saldo-box .l{font-size:.62rem; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.3px;}
+  .saldo-box .v{font-family:var(--mono); font-size:1rem; font-weight:700; margin-top:2px;}
+  .saldo-box.vencido .v{color:var(--accent);}
+  .saldo-box.proximo .v{color:var(--ink-dim);}
+  .saldo-box.acumulo .v{color:var(--azul);}
+  .saldo-concluido{
+    font-size:.74rem; color:var(--ink-dim); background:var(--panel-2); border:1px solid var(--line);
+    border-radius:8px; padding:8px 10px; margin-top:9px; flex:1; min-width:120px;
+  }
+  .saldo-pronto-encerrar{
+    font-size:.76rem; color:var(--ink); background:rgba(46,204,113,.1); border:1px solid var(--verde);
+    border-radius:8px; padding:10px 12px; margin-top:9px; flex:1; min-width:180px; font-weight:600;
+  }
+
+  .status-pill{font-family:var(--mono); font-size:.68rem; font-weight:700; padding:4px 9px; border-radius:20px; white-space:nowrap; letter-spacing:.3px;}
+  .status-pill.red{background:rgba(255,82,82,.15); color:var(--vermelho);}
+  .status-pill.yellow{background:rgba(244,196,48,.15); color:var(--amarelo);}
+  .status-pill.green{background:rgba(46,204,113,.15); color:var(--verde);}
+  .status-pill.aquisicao{background:rgba(138,149,165,.15); color:var(--ink-dim);}
+
+  .card-actions{display:flex; gap:6px;}
+  .icon-btn{background:transparent; border:1px solid var(--line); color:var(--ink-dim); border-radius:7px; width:30px; height:30px; cursor:pointer; font-size:.85rem; display:flex; align-items:center; justify-content:center;}
+  .icon-btn:hover{border-color:var(--accent); color:var(--accent);}
+
+  .card-bottom{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); flex-wrap:wrap;}
+  .aprov-actions{display:flex; gap:6px; flex-wrap:wrap;}
+  .aprov-btn{font-size:.68rem; padding:5px 9px; border-radius:20px; border:1px solid var(--line); background:transparent; color:var(--ink-dim); cursor:pointer;}
+  .aprov-btn.on.aguardando{border-color:var(--azul); color:var(--azul); background:rgba(77,158,255,.1);}
+  .aprov-btn.on.aprovada{border-color:var(--roxo); color:var(--roxo); background:rgba(176,124,255,.1);}
+  .card-bottom-actions{display:flex; gap:6px;}
+  .link-btn{background:none; border:none; color:var(--ink-dim); font-size:.68rem; text-decoration:underline; cursor:pointer; padding:6px 2px;}
+  .link-btn:hover{color:var(--accent);}
+  .link-btn[disabled]{opacity:.35; cursor:not-allowed; text-decoration:none;}
+  .btn-primary[disabled]{opacity:.35; cursor:not-allowed;}
+
+  .parcelas-list{font-size:.68rem; color:var(--ink-dim); margin-top:6px; font-family:var(--mono);}
+  .parcelas-lista{display:flex; flex-direction:column; gap:5px; margin-top:8px;}
+  .parcela-item{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:7px;
+    padding:6px 9px; font-size:.7rem; font-family:var(--mono);
+  }
+  .parcela-status{font-family:var(--sans); font-size:.65rem; font-weight:600; padding:2px 7px; border-radius:20px;}
+  .parcela-status.aguardando{background:rgba(77,158,255,.15); color:var(--azul);}
+  .parcela-status.aprovada{background:rgba(46,204,113,.15); color:var(--verde);}
+  .parcela-status.atencao{background:rgba(244,196,48,.15); color:var(--amarelo);}
+  .icon-btn-sm{width:22px; height:22px; font-size:.7rem; margin-left:auto;}
+  .prox-ferias{font-size:.76rem; color:var(--verde); margin-top:8px; background:rgba(46,204,113,.1); border:1px solid rgba(46,204,113,.3); border-radius:8px; padding:6px 9px; display:inline-block;}
+  .alerta-multiplo{font-size:.74rem; color:var(--vermelho); background:rgba(255,82,82,.12); border:1px solid rgba(255,82,82,.35); border-radius:8px; padding:6px 9px; margin-top:6px; font-weight:600;}
+  .alerta-proximo{font-size:.74rem; color:var(--amarelo); background:rgba(244,196,48,.12); border:1px solid rgba(244,196,48,.35); border-radius:8px; padding:6px 9px; margin-top:6px; font-weight:600;}
+
+  .empty{text-align:center; padding:50px 20px; color:var(--ink-dim);}
+
+  .fab{position:fixed; bottom:20px; right:20px; width:52px; height:52px; border-radius:50%; background:var(--accent); color:#1a1006; font-size:1.5rem; border:none; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:20;}
+
+  .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center; z-index:100;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--panel); border:1px solid var(--line); border-radius:16px 16px 0 0; width:100%; max-width:480px; padding:20px 18px 26px; max-height:88vh; overflow-y:auto; box-sizing:border-box;}
+  .modal-wide{max-width:560px;}
+  .modal-fullscreen{
+    max-width:100% !important; width:100% !important; height:100vh !important; max-height:100vh !important;
+    border-radius:0 !important; margin:0;
+  }
+  @media(min-width:520px){ .modal-overlay{align-items:center;} .modal{border-radius:16px;} }
+  @media(max-width:380px){ .modal{padding:16px 12px 20px;} }
+
+  .ciclo-card{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-bottom:10px;}
+  .ciclo-top{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;}
+  .ciclo-titulo{font-weight:600; font-size:.85rem;}
+  .ciclo-saldo{font-family:var(--mono); font-size:.78rem; color:var(--accent); font-weight:700;}
+  .ciclo-datas{font-family:var(--mono); font-size:.7rem; color:var(--ink-dim); display:flex; flex-wrap:wrap; gap:8px 12px;}
+  .ciclo-datas b{color:var(--ink);}
+
+  .dash-header-bar{
+    display:flex; justify-content:space-between; align-items:baseline;
+    border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:16px;
+  }
+  .dash-header-bar .dash-total{font-family:var(--mono); font-size:.72rem; color:var(--ink-dim);}
+  .dash-summary{display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap;}
+  .dash-chip{
+    flex:1; min-width:110px; background:var(--panel-2); border:1px solid var(--line);
+    border-left:3px solid var(--ink-dim); border-radius:8px; padding:11px 12px;
+  }
+  .dash-chip .dash-n{font-family:var(--mono); font-size:1.55rem; font-weight:700; line-height:1;}
+  .dash-chip .dash-l{font-size:.62rem; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.4px; margin-top:5px;}
+  .dash-chip.aguardando{border-left-color:var(--azul);}
+  .dash-chip.aguardando .dash-n{color:var(--azul);}
+  .dash-chip.aprovada{border-left-color:var(--roxo);}
+  .dash-chip.aprovada .dash-n{color:var(--roxo);}
+  .dash-chip.programada{border-left-color:var(--verde);}
+  .dash-chip.programada .dash-n{color:var(--verde);}
+  .dash-chip.emferias{border-left-color:var(--accent);}
+  .dash-chip.emferias .dash-n{color:var(--accent);}
+
+  .dash-secao{
+    display:flex; align-items:center; gap:8px;
+    font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+    margin:22px 0 10px; color:var(--ink-dim);
+  }
+  .dash-secao .dash-secao-badge{
+    font-family:var(--mono); font-size:.68rem; font-weight:700; color:var(--ink);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:20px;
+    padding:1px 8px;
+  }
+  .dash-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--line); border-radius:8px;
+    padding:10px 13px; margin-bottom:8px;
+  }
+  .dash-row.b-emferias{border-left-color:var(--accent);}
+  .dash-row.b-programada{border-left-color:var(--verde);}
+  .dash-row.b-aguardando{border-left-color:var(--azul);}
+  .dash-row.b-aprovada{border-left-color:var(--roxo);}
+  .dash-row .dash-nome{font-weight:600; font-size:.83rem;}
+  .dash-row .dash-info{font-family:var(--mono); font-size:.7rem; color:var(--ink-dim); text-align:right; line-height:1.5;}
+  .dash-row .dash-info b{color:var(--ink);}
+  .dash-lista-preview{max-height:216px; overflow-y:auto; padding-right:2px;}
+  .dash-chip[data-tab]{cursor:pointer; transition:.15s;}
+  .dash-chip[data-tab]:hover{border-color:var(--accent); background:var(--panel);}
+  .dash-row-acoes{display:flex; gap:6px; flex-shrink:0;}
+  .btn-aprovar{background:rgba(46,204,113,.15); border:1px solid var(--verde); color:var(--verde); border-radius:7px; padding:5px 9px; font-size:.68rem; font-weight:600; cursor:pointer;}
+  .btn-reprovar{background:rgba(255,82,82,.15); border:1px solid var(--vermelho); color:var(--vermelho); border-radius:7px; padding:5px 9px; font-size:.68rem; font-weight:600; cursor:pointer;}
+  .dash-empty{font-size:.78rem; color:var(--ink-dim); padding:6px 2px 4px;}
+  .modal h2{margin:0 0 14px; font-size:1.05rem;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:.75rem; color:var(--ink-dim); margin-bottom:5px;}
+  .field input, .field select, .field textarea{width:100%; box-sizing:border-box;}
+  .row2{display:flex; gap:10px; flex-wrap:wrap;}
+  .row2 .field{min-width:130px;}
+  .row2 .field{flex:1;}
+  .modal-actions{display:flex; gap:8px; margin-top:16px;}
+  .modal-actions .btn{flex:1;}
+  .helptext{font-size:.7rem; color:var(--ink-dim); margin-top:4px; line-height:1.4;}
+  .error-box{background:rgba(255,82,82,.1); border:1px solid var(--vermelho); color:var(--vermelho); border-radius:8px; padding:9px 11px; font-size:.76rem; margin-bottom:12px; display:none; line-height:1.5;}
+  .error-box.show{display:block;}
+
+  .tabs{display:flex; gap:6px; margin-bottom:14px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .tab-btn{background:none; border:none; color:var(--ink-dim); padding:8px 4px 10px; font-size:.82rem; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;}
+  .tab-btn.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .dashtab-btn{background:none; border:none; color:var(--ink-dim); padding:8px 4px 10px; font-size:.78rem; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;}
+  .dashtab-btn.active{color:var(--accent); border-bottom-color:var(--accent);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .preview-table{width:100%; border-collapse:collapse; font-size:.75rem; margin-top:8px;}
+  .preview-table th, .preview-table td{border:1px solid var(--line); padding:5px 7px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;}
+  .preview-table th{color:var(--ink-dim); font-weight:600;}
+
+  #toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel-2); border:1px solid var(--line); padding:10px 18px; border-radius:10px; font-size:.82rem; opacity:0; transition:.25s; pointer-events:none; z-index:200; max-width:85vw; text-align:center;}
+  #toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- Tela de login (só aparece quando publicado fora do Claude, com Firebase disponível) -->
+<div class="modal-overlay open" id="loginOverlay">
+  <div class="modal" style="max-width:360px;">
+    <h2 style="margin-bottom:4px;">Controle de Férias</h2>
+    <p class="helptext" style="margin-bottom:18px;">Entre com o e-mail e senha cadastrados no Firebase deste projeto.</p>
+    <div class="error-box" id="loginErro"></div>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="loginSenha" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btnLogin" style="width:100%;">Entrar</button>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+<header>
+  <div>
+    <h1>Controle de Férias <span class="tag">LOGÍSTICA</span></h1>
+    <p>Saldo, vencimento e regras de parcelamento calculados a partir da data-base de cada período</p>
+    <div class="user-bar" id="userBar" style="display:none;">
+      <span class="sync-dot"></span>
+      <span id="userEmailTxt"></span>
+      <button class="logout-link" id="btnLogout">Sair</button>
+    </div>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <button class="gear-btn" id="btnRegras" title="Configurar regras">⚙</button>
+  </div>
+</header>
+
+<div class="dash-toolbar">
+  <button class="dash-cta" id="btnDashboard">📊 Dashboard</button>
+  <button class="dash-mini-chip emferias" data-tab="emferias"><span class="dash-mini-n" id="miniCntEmFerias">0</span> Em férias</button>
+  <button class="dash-mini-chip programada" data-tab="proximas"><span class="dash-mini-n" id="miniCntProgramada">0</span> Próximas</button>
+  <button class="dash-mini-chip aguardando" data-tab="aguardando"><span class="dash-mini-n" id="miniCntAguardando">0</span> Aguardando RH</button>
+  <button class="dash-mini-chip aprovada" data-tab="aprovada"><span class="dash-mini-n" id="miniCntAprovada">0</span> Aprovadas</button>
+</div>
+
+<div class="summary" id="summary">
+  <div class="chip" data-filter="all"><div class="n" id="cnt-all">0</div><div class="l">Todos</div></div>
+  <div class="chip red" data-filter="red"><div class="n" id="cnt-red">0</div><div class="l">Vencido</div></div>
+  <div class="chip yellow" data-filter="yellow"><div class="n" id="cnt-yellow">0</div><div class="l">Atenção</div></div>
+  <div class="chip green" data-filter="green"><div class="n" id="cnt-green">0</div><div class="l">Em dia</div></div>
+  <div class="chip yellow" data-filter="segundo"><div class="n" id="cnt-segundo">0</div><div class="l">2º venc. próximo</div></div>
+</div>
+
+<div class="threshold">
+  Alertar em amarelo:
+  <select id="thresholdSelect">
+    <option value="30">30 dias antes</option>
+    <option value="60" selected>60 dias antes</option>
+  </select>
+  do limite
+</div>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="Buscar colaborador...">
+  <select id="sortSelect">
+    <option value="urgencia">Mais urgente primeiro</option>
+    <option value="nome">Nome (A-Z)</option>
+  </select>
+  <button class="btn btn-ghost" id="btnImport">Importar</button>
+</div>
+
+<main id="list"></main>
+
+<button class="fab" id="btnAdd" title="Adicionar colaborador">+</button>
+
+<!-- Modal Adicionar/Editar -->
+<div class="modal-overlay" id="modalForm">
+  <div class="modal">
+    <h2 id="formTitle">Novo colaborador</h2>
+    <input type="hidden" id="editId">
+    <div class="field">
+      <label>Nome do colaborador</label>
+      <input type="text" id="fNome" placeholder="Ex: João da Silva">
+    </div>
+    <div class="field">
+      <label>Data-base (início do período aquisitivo em aberto)</label>
+      <input type="date" id="fData">
+      <div class="helptext">
+        Pode ser a data de admissão OU a data de início de um período de férias anterior já conhecido — o que importa é ser o começo do ciclo de 12 meses que ainda está em aberto (vencido ou em aquisição).
+      </div>
+    </div>
+    <div class="field">
+      <label>Observação (opcional)</label>
+      <input type="text" id="fObs" placeholder="Ex: setor, turno...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelForm">Cancelar</button>
+      <button class="btn btn-primary" id="btnSaveForm">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Importar -->
+<div class="modal-overlay" id="modalImport">
+  <div class="modal">
+    <h2>Importar colaboradores</h2>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="excel">Planilha Excel</button>
+      <button class="tab-btn" data-tab="texto">Colar texto</button>
+    </div>
+    <div class="tab-panel active" id="tab-excel">
+      <div class="field">
+        <label>Selecione o arquivo (.xlsx ou .xls)</label>
+        <input type="file" id="excelFile" accept=".xlsx,.xls">
+      </div>
+      <div id="excelMapping" style="display:none;">
+        <div class="field">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="chkComSaldo" style="width:auto;">
+            Esta planilha já tem controle de saldo (várias linhas por colaborador, com colunas de Direito/Total resto)
+          </label>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Coluna do nome</label>
+            <select id="colNome"></select>
+          </div>
+          <div class="field">
+            <label>Coluna da data (início do período)</label>
+            <select id="colData"></select>
+          </div>
+        </div>
+        <div class="row2" id="rowSaldoCols" style="display:none;">
+          <div class="field">
+            <label>Coluna "Direito"</label>
+            <select id="colDireito"></select>
+          </div>
+          <div class="field">
+            <label>Coluna "Total resto"</label>
+            <select id="colResto"></select>
+          </div>
+        </div>
+        <div class="helptext">
+          Se marcar a opção acima: o app agrupa as linhas por nome, usa a data mais antiga como base e reconstrói automaticamente os dias já usados (Direito - Total resto) como uma parcela histórica — assim o saldo já entra correto.
+        </div>
+        <div id="excelPreviewWrap" style="overflow-x:auto;"></div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-texto">
+      <div class="helptext" style="margin-bottom:10px;">
+        Cole uma linha por colaborador, no formato:<br>
+        <b>Nome; dd/mm/aaaa</b> — exemplo: <i>João da Silva; 15/03/2023</i>
+      </div>
+      <div class="field">
+        <textarea id="importText" rows="7" placeholder="João da Silva; 15/03/2023&#10;Maria Souza; 02/11/2021"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelImport">Cancelar</button>
+      <button class="btn btn-primary" id="btnConfirmImport">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Lançar férias -->
+<div class="modal-overlay" id="modalLancar">
+  <div class="modal">
+    <h2>Lançar férias — <span id="lancarNome"></span></h2>
+    <div class="helptext" style="margin-bottom:10px;">
+      Saldo disponível: <b id="lancarSaldoTxt">0</b> dias · Parcelas usadas neste período: <b id="lancarParcelasTxt">0</b>
+    </div>
+    <div class="error-box" id="lancarErro"></div>
+    <div class="field">
+      <label>Quantos dias serão tirados nesta parcela?</label>
+      <input type="number" id="lancarDias" min="1" placeholder="Ex: 10">
+    </div>
+    <div class="field">
+      <label>Data prevista de início das férias</label>
+      <input type="date" id="lancarDataPrevista">
+    </div>
+    <div class="field">
+      <label>Status de aprovação (opcional)</label>
+      <div class="aprov-actions" id="lancarAprovacaoBtns">
+        <button type="button" class="aprov-btn" data-valor="aguardando">🕓 Aguardando RH</button>
+        <button type="button" class="aprov-btn" data-valor="aprovada">✅ Já aprovada</button>
+      </div>
+    </div>
+    <input type="hidden" id="lancarId">
+    <input type="hidden" id="lancarStatusEscolhido">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelLancar">Cancelar</button>
+      <button class="btn btn-primary" id="btnConfirmLancar">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar parcela -->
+<div class="modal-overlay" id="modalEditarParcela">
+  <div class="modal">
+    <h2>Editar parcela — <span id="editParcelaNome"></span></h2>
+    <div class="error-box" id="editParcelaErro"></div>
+    <div class="field">
+      <label>Quantos dias</label>
+      <input type="number" id="editParcelaDias" min="1">
+    </div>
+    <div class="field">
+      <label>Data prevista de início</label>
+      <input type="date" id="editParcelaData">
+    </div>
+    <div class="field">
+      <label>Status de aprovação</label>
+      <div class="aprov-actions" id="editParcelaAprovacaoBtns">
+        <button type="button" class="aprov-btn" data-valor="aguardando">🕓 Aguardando RH</button>
+        <button type="button" class="aprov-btn" data-valor="aprovada">✅ Aprovada</button>
+      </div>
+    </div>
+    <input type="hidden" id="editParcelaColabId">
+    <input type="hidden" id="editParcelaId">
+    <input type="hidden" id="editParcelaStatusEscolhido">
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="btnExcluirParcela">Excluir parcela</button>
+      <button class="btn btn-ghost" id="btnCancelEditarParcela">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarEditarParcela">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Encerrar período(s) -->
+<div class="modal-overlay" id="modalEncerrar">
+  <div class="modal modal-wide">
+    <h2>Encerrar período(s) — <span id="encerrarNome"></span></h2>
+    <input type="hidden" id="encerrarId">
+    <div class="helptext" style="margin-bottom:12px;">
+      Encerrar um período mais recente também encerra os anteriores a ele automaticamente.
+    </div>
+    <div id="encerrarLista"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelEncerrar" style="flex:1;">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Regras -->
+<div class="modal-overlay" id="modalRegras">
+  <div class="modal">
+    <h2>Regras de férias</h2>
+    <div class="helptext" style="margin-bottom:14px;">Baseadas na CLT atual — ajuste aqui caso a legislação mude no futuro.</div>
+    <div class="field"><label>Dias de direito por mês trabalhado</label><input type="number" step="0.1" id="rDiasPorMes"></div>
+    <div class="field"><label>Mínimo de dias por parcela</label><input type="number" id="rDiasMinParcela"></div>
+    <div class="field"><label>Pelo menos uma parcela deve ter no mínimo (dias)</label><input type="number" id="rDiasMinParcelaMaior"></div>
+    <div class="field"><label>Máximo de parcelas por período</label><input type="number" id="rMaxParcelas"></div>
+    <div class="field"><label>Alertar quando faltarem X dias para o período seguinte também vencer</label><input type="number" id="rAlertaSegundo"></div>
+    <div class="field"><label>Meses após o vencimento até o limite legal (padrão 8 = total de 1 ano e 8 meses desde o início do período)</label><input type="number" id="rMesesAteLimite"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelRegras">Cancelar</button>
+      <button class="btn btn-primary" id="btnSaveRegras">Salvar regras</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
+      <div class="helptext" style="margin-bottom:8px;">Exportar dados para backup ou consulta futura.</div>
+      <button class="btn btn-ghost" id="btnExportar" style="width:100%; margin-bottom:8px;">📤 Exportar histórico de férias (.xlsx)</button>
+      <button class="btn btn-ghost" id="btnExportarPDF" style="width:100%;">📄 Exportar relatório para reunião (PDF)</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
+      <div class="helptext" style="margin-bottom:8px;">
+        Limpeza de histórico — mantém só os períodos encerrados mais recentes de cada colaborador,
+        reduzindo o tamanho dos registros conforme o uso vai acumulando ao longo do tempo. Não afeta o período em aberto atual.
+      </div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>Manter os últimos ___ períodos encerrados por colaborador</label>
+        <input type="number" id="rManterHistorico" min="0" placeholder="Ex: 2">
+      </div>
+      <button class="btn btn-ghost" id="btnLimparHistorico" style="width:100%;">🧹 Aplicar limpeza de histórico</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
+      <div class="helptext" style="margin-bottom:8px;">Zona de risco — apaga dados, não dá pra desfazer.</div>
+      <button class="btn btn-danger" id="btnApagarTudo" style="width:100%;">🗑 Apagar todos os colaboradores</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Dashboard -->
+<div class="modal-overlay" id="modalDashboard">
+  <div class="modal modal-wide modal-fullscreen">
+    <div class="dash-header-bar">
+      <div>
+        <h2 style="margin:0;">Dashboard de Férias</h2>
+        <p class="helptext" style="margin:2px 0 0;">Situação em <span id="dashData"></span></p>
+      </div>
+      <span class="dash-total"><span id="dashTotalColaboradores">0</span> colaboradores</span>
+    </div>
+    <p class="helptext" style="margin-bottom:16px;">Os nomes de cada categoria já aparecem ao lado do gráfico.</p>
+
+    <div class="pizza-linhas">
+      <div class="pizza-linha">
+        <div class="pizza-svg-wrap"><svg id="pizzaEmFerias" viewBox="0 0 36 36" class="pizza-svg"></svg><div class="pizza-pct" id="pizzaPctEmFerias">0%</div></div>
+        <div class="pizza-detalhes">
+          <div class="pizza-titulo">🟢 Em férias agora</div>
+          <div class="pizza-sub" id="pizzaSubEmFerias">0 de 0 pessoas</div>
+          <div class="pizza-nomes" id="pizzaNomesEmFerias"></div>
+        </div>
+      </div>
+      <div class="pizza-linha">
+        <div class="pizza-svg-wrap"><svg id="pizzaAguardando" viewBox="0 0 36 36" class="pizza-svg"></svg><div class="pizza-pct" id="pizzaPctAguardando">0%</div></div>
+        <div class="pizza-detalhes">
+          <div class="pizza-titulo">🕓 Aguardando RH</div>
+          <div class="pizza-sub" id="pizzaSubAguardando">0 de 0 programadas</div>
+          <div class="pizza-nomes" id="pizzaNomesAguardando"></div>
+        </div>
+      </div>
+      <div class="pizza-linha">
+        <div class="pizza-svg-wrap"><svg id="pizzaAprovada" viewBox="0 0 36 36" class="pizza-svg"></svg><div class="pizza-pct" id="pizzaPctAprovada">0%</div></div>
+        <div class="pizza-detalhes">
+          <div class="pizza-titulo">✅ Aprovadas</div>
+          <div class="pizza-sub" id="pizzaSubAprovada">0 de 0 programadas</div>
+          <div class="pizza-nomes" id="pizzaNomesAprovada"></div>
+        </div>
+      </div>
+      <div class="pizza-linha">
+        <div class="pizza-svg-wrap"><svg id="pizzaAlerta" viewBox="0 0 36 36" class="pizza-svg"></svg><div class="pizza-pct" id="pizzaPctAlerta">0%</div></div>
+        <div class="pizza-detalhes">
+          <div class="pizza-titulo">⏳ Em alerta (2º período próximo)</div>
+          <div class="pizza-sub" id="pizzaSubAlerta">0 de 0 pessoas</div>
+          <div class="pizza-nomes" id="pizzaNomesAlerta"></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="dash-secao" style="margin-top:24px;">📅 Calendário de cobertura</h3>
+    <div class="cal-header">
+      <button class="cal-nav" id="calMesAnterior">‹</button>
+      <span class="cal-titulo" id="calTitulo">Mês</span>
+      <button class="cal-nav" id="calMesSeguinte">›</button>
+    </div>
+    <div class="cal-grid" id="calGradeDias"></div>
+    <div id="calDetalheDia"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelDashboard" style="flex:1;">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Dashboard Expandido (uma categoria por vez, sem abas) -->
+<div class="modal-overlay" id="modalDashExpandido">
+  <div class="modal modal-wide modal-fullscreen">
+    <h2 id="dashExpTitulo">Detalhamento</h2>
+    <div id="dashExpConteudo"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelDashExpandido" style="flex:1;">Fechar</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Modal Histórico -->
+<div class="modal-overlay" id="modalHistorico">
+  <div class="modal modal-wide">
+    <h2>Histórico de férias — <span id="historicoNome"></span></h2>
+    <div id="historicoLista"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelHistorico" style="flex:1;">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmação (substitui o confirm() nativo, que fica bloqueado em alguns ambientes) -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal" style="max-width:380px;">
+    <h2 id="confirmTitulo">Confirmar</h2>
+    <p id="confirmMensagem" style="font-size:.85rem; color:var(--ink-dim); line-height:1.5; margin:0 0 18px;"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnConfirmNao">Cancelar</button>
+      <button class="btn btn-primary" id="btnConfirmSim">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/*
+  ESTRUTURA DE DADOS (pensada para futura migração ao painel de ações):
+  colaborador = {
+    id, nome,
+    baseData: 'YYYY-MM-DD',        // data-base: admissão OU início de um período de férias anterior conhecido
+    periodosFechados: number,      // quantos ciclos de 12 meses já foram encerrados a partir de baseData
+    lancamentos: [{ dias, data }], // parcelas de férias já gozadas NESTE período vencido
+    statusAprovacao: null | 'aguardando' | 'aprovada',
+    obs: string,
+    historico: [{ dataConclusao, diasDireito, diasGozados, parcelas }]
+  }
+
+  regras (globais, ajustáveis em ⚙):
+  { diasPorMes, diasMinParcela, diasMinParcelaMaior, maxParcelas }
+
+  Cálculo (tudo a partir de baseData + periodosFechados):
+    inicioPeriodo = baseData + 12*periodosFechados meses
+    vencPeriodo   = inicioPeriodo + 12 meses            -> quando o período completa e "vence"
+    limite        = vencPeriodo + regras.mesesAteLimite (padrão 8m, total 1a8m desde o início) -> prazo p/ gozar (cor do card)
+
+    Se hoje < vencPeriodo:  período ainda em aquisição
+      diasAcumulados = mesesEntre(inicioPeriodo, hoje) * diasPorMes   (proporcional, ainda sem saldo vencido)
+    Se hoje >= vencPeriodo: período já vencido, abre o próximo em paralelo
+      saldoVencido  = 12*diasPorMes - soma(lancamentos.dias)
+      saldoProximo  = min(12, mesesEntre(vencPeriodo, hoje)) * diasPorMes   (proporcional do novo período em aquisição)
+
+  Lançamentos só podem ser feitos quando o período já venceu (saldoVencido > 0).
+  Validação de parcelamento roda antes de gravar (saldo, mínimo por parcela,
+  parcela grande obrigatória, máximo de parcelas). O período NUNCA se encerra
+  sozinho, mesmo com saldo zerado — a data programada pode ainda estar no
+  futuro, e fechar o período apagaria essa visibilidade. Encerrar é sempre
+  uma ação manual do usuário ("Encerrar manualmente" / "Encerrar até aqui").
+*/
+
+const STORAGE_KEY = 'ferias:colaboradores';
+const THRESHOLD_KEY = 'ferias:threshold';
+const REGRAS_KEY = 'ferias:regras';
+
+// ---------- Firebase (mesmo projeto do fluxo de caixa) ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyAKhSm43ttSeQTNjAb6Kbiue-UYvEkAIjM",
+  authDomain: "gestao-de-ferias-45575.firebaseapp.com",
+  projectId: "gestao-de-ferias-45575",
+  storageBucket: "gestao-de-ferias-45575.firebasestorage.app",
+  messagingSenderId: "234840056289",
+  appId: "1:234840056289:web:ffd3f5617b50db766af2a0",
+};
+let firebaseReady = false;
+let authInstance = null;
+let dbInstance = null;
+let currentUser = null;
+function feriasDoc(){ return dbInstance.collection('ferias-app').doc('shared'); }
+try{
+  if(typeof firebase !== 'undefined'){
+    firebase.initializeApp(firebaseConfig);
+    authInstance = firebase.auth();
+    dbInstance = firebase.firestore();
+    try{ dbInstance.enablePersistence({ synchronizeTabs: true }).catch(()=>{}); }catch(e){}
+    firebaseReady = true;
+  }
+}catch(e){ firebaseReady = false; }
+
+/* Fallback de armazenamento: usa Firestore quando logado (publicado fora do
+   Claude, com Firebase disponível); senão tenta window.storage (dentro do
+   Claude); em último caso, localStorage do navegador. */
+async function storageGet(key, shared){
+  if(firebaseReady && currentUser){
+    try{
+      const snap = await feriasDoc().get();
+      const data = snap.exists ? snap.data() : {};
+      return (data[key] !== undefined) ? {key, value: data[key], shared: !!shared} : null;
+    }catch(e){ /* cai para os fallbacks abaixo */ }
+  }
+  if(typeof window.storage !== 'undefined' && window.storage){
+    try{ return await window.storage.get(key, shared); }
+    catch(e){ /* cai para localStorage */ }
+  }
+  try{
+    const raw = localStorage.getItem(key);
+    return raw !== null ? {key, value:raw, shared:!!shared} : null;
+  }catch(e){ return null; }
+}
+async function storageSet(key, value, shared){
+  if(firebaseReady && currentUser){
+    try{
+      await feriasDoc().set({ [key]: value }, { merge: true });
+      return {key, value, shared: !!shared};
+    }catch(e){ /* cai para os fallbacks abaixo */ }
+  }
+  if(typeof window.storage !== 'undefined' && window.storage){
+    try{ return await window.storage.set(key, value, shared); }
+    catch(e){ /* cai para localStorage */ }
+  }
+  try{
+    localStorage.setItem(key, value);
+    return {key, value, shared:!!shared};
+  }catch(e){ return null; }
+}
+const REGRAS_PADRAO = { diasPorMes: 2.5, diasMinParcela: 5, diasMinParcelaMaior: 14, maxParcelas: 3, alertaSegundoPeriodoDias: 120, mesesAteLimite: 8 };
+
+let colaboradores = [];
+let contadorIdLocal = 0;
+function gerarId(prefixo){
+  contadorIdLocal++;
+  return `${prefixo}${Date.now()}${contadorIdLocal}${Math.random().toString(36).slice(2,9)}`;
+}
+let filtroAtual = 'all';
+let thresholdAmarelo = 60;
+let regras = { ...REGRAS_PADRAO };
+let excelRows = null;
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2700);
+}
+
+// Substitui window.confirm() (bloqueado silenciosamente em alguns ambientes de
+// pré-visualização) por um modal próprio. Uso: if(await askConfirm('mensagem')){ ... }
+function askConfirm(mensagem, titulo){
+  return new Promise((resolve) => {
+    $('confirmTitulo').textContent = titulo || 'Confirmar';
+    $('confirmMensagem').textContent = mensagem;
+    $('modalConfirm').classList.add('open');
+
+    const limpar = () => {
+      $('modalConfirm').classList.remove('open');
+      btnSim.removeEventListener('click', onSim);
+      btnNao.removeEventListener('click', onNao);
+    };
+    const btnSim = $('btnConfirmSim');
+    const btnNao = $('btnConfirmNao');
+    const onSim = () => { limpar(); resolve(true); };
+    const onNao = () => { limpar(); resolve(false); };
+    btnSim.addEventListener('click', onSim);
+    btnNao.addEventListener('click', onNao);
+  });
+}
+
+// ---------- Datas ----------
+function addMonths(date, months){
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+function mesesEntre(inicio, fim){
+  let meses = (fim.getFullYear() - inicio.getFullYear()) * 12 + (fim.getMonth() - inicio.getMonth());
+  if(fim.getDate() < inicio.getDate()) meses--;
+  return Math.max(0, meses);
+}
+function parseISO(s){
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+function calcularStatus(c){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const base = parseISO(c.baseData);
+  const diasDireito = 12 * regras.diasPorMes; // direito por ciclo de 12 meses (padrão 30)
+
+  // Quantos ciclos de 12 meses já se completaram desde a base, no total.
+  const totalCiclosCompletos = Math.floor(mesesEntre(base, hoje) / 12);
+  const k = c.periodosFechados; // ciclos já formalmente encerrados
+  const ciclosAbertos = Math.max(0, totalCiclosCompletos - k); // ciclos vencidos e NÃO encerrados (pode ser 0, 1, 2...)
+
+  // Ciclo vencido mais antigo em aberto (o mais urgente) — define a cor/prazo do card.
+  const inicioMaisAntigo = addMonths(base, 12 * k);
+  const vencMaisAntigo = addMonths(inicioMaisAntigo, 12);
+  const limiteMaisAntigo = addMonths(vencMaisAntigo, regras.mesesAteLimite);
+
+  const emAquisicao = ciclosAbertos === 0; // nenhum ciclo vencido em aberto -> ainda acumulando o primeiro
+
+  let saldoVencido = 0, diasGozados = 0, diasAcumulados = 0, saldoProximo = 0;
+  let inicioAcumulo, vencPeriodo, limite;
+
+  if(emAquisicao){
+    inicioAcumulo = inicioMaisAntigo;
+    vencPeriodo = vencMaisAntigo;
+    limite = limiteMaisAntigo;
+    diasAcumulados = Math.min(diasDireito, mesesEntre(inicioAcumulo, hoje) * regras.diasPorMes);
+  } else {
+    diasGozados = (c.lancamentos || []).reduce((s,l) => s + l.dias, 0);
+    const diasDireitoTotalAberto = ciclosAbertos * diasDireito;
+    saldoVencido = Math.max(0, diasDireitoTotalAberto - diasGozados);
+    vencPeriodo = vencMaisAntigo;
+    limite = limiteMaisAntigo;
+
+    // Período em aquisição atual = o que vem logo depois do último ciclo vencido em aberto.
+    inicioAcumulo = addMonths(base, 12 * (k + ciclosAbertos));
+    const mesesProx = Math.min(12, mesesEntre(inicioAcumulo, hoje));
+    saldoProximo = mesesProx * regras.diasPorMes;
+  }
+
+  const diasAteLimite = Math.round((limite - hoje) / 86400000);
+
+  // Alerta antecipado: quando o período em aquisição está perto de vencer também
+  // (viraria mais um ciclo vencido empilhado, além dos que já existem).
+  let diasParaProximoVencimento = null;
+  if(!emAquisicao){
+    const proxVenc = addMonths(inicioAcumulo, 12);
+    diasParaProximoVencimento = Math.round((proxVenc - hoje) / 86400000);
+  }
+
+  // A urgência real do card é o MENOR entre "prazo legal do período mais antigo"
+  // e "quanto falta para o próximo período também vencer e empilhar" — mostrar só
+  // o prazo legal distante esconde um problema mais próximo (empilhar mais um período).
+  const diasRestantes = emAquisicao ? diasAteLimite : Math.min(diasAteLimite, diasParaProximoVencimento);
+  const eventoMaisProximo = (!emAquisicao && diasParaProximoVencimento < diasAteLimite) ? 'proximoPeriodo' : 'limite';
+
+  let cor = 'green';
+  if(!emAquisicao){
+    if(diasAteLimite <= 0) cor = 'red';
+    else if(diasRestantes <= thresholdAmarelo) cor = 'yellow';
+  }
+
+  return {
+    inicioPeriodo: inicioMaisAntigo, vencPeriodo, limite, diasRestantes, diasAteLimite, cor, emAquisicao,
+    diasDireito, diasGozados, saldoVencido, saldoProximo, diasAcumulados,
+    ciclosAbertos, diasParaProximoVencimento, inicioAcumulo, eventoMaisProximo
+  };
+}
+
+function fmtData(d){ return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}); }
+function fmtDias(n){ return (Math.round(n*10)/10).toString().replace('.0',''); }
+
+// Dados da planilha de referência (jan/2025) enviada pelo usuário — aplicados
+// automaticamente uma única vez, mesclando com o que já existir (sem duplicar nomes).
+const SEED_KEY = 'ferias:seedAplicado';
+const SEED_INICIAL = [{"nome": "REGIS EDUARDO GONCALVES", "baseData": "2024-03-13", "usado": 18}, {"nome": "DOUGLAS RICARDO PEDROSO", "baseData": "2024-04-06", "usado": 18}, {"nome": "LUCAS MOREIRA FABIANO", "baseData": "2024-04-22", "usado": 18}, {"nome": "LUIZ CARLOS DA SILVA", "baseData": "2024-04-24", "usado": 21}, {"nome": "BRUNO SILVA ANDRADE", "baseData": "2024-05-03", "usado": 18}, {"nome": "NILTON JUNIOR BENTO", "baseData": "2024-05-03", "usado": 18}, {"nome": "EMERSON JOSE DOS SANTOS", "baseData": "2024-05-03", "usado": 10}, {"nome": "PEDRO VINICIUS EMBOAVA", "baseData": "2024-06-01", "usado": 18}, {"nome": "ACASSIO RIBEIRO AUGUSTO", "baseData": "2024-07-10", "usado": 11}, {"nome": "DIOGO JONATHAN DA SILVA", "baseData": "2024-08-21", "usado": 14}, {"nome": "LEONARDO COSTA DOS SANTOS", "baseData": "2024-08-27", "usado": 0}, {"nome": "ANDRE LUIZ DE ALMEIDA RAIMUNDO", "baseData": "2024-10-02", "usado": 18}, {"nome": "ARILSON TADEU DE OLIVEIRA", "baseData": "2024-10-13", "usado": 18}, {"nome": "FAGNER ALVES PEREIRA", "baseData": "2024-10-03", "usado": 18}, {"nome": "EDER LUIZ DA SILVA", "baseData": "2024-10-17", "usado": 18}, {"nome": "OSMILER TORRES", "baseData": "2024-10-17", "usado": 18}, {"nome": "DANIEL FABIANO DE OLIVEIRA", "baseData": "2024-11-01", "usado": 18}, {"nome": "RODRIGO ANDRADE DA FONSECA", "baseData": "2024-12-01", "usado": 18}, {"nome": "ALYSON MARTINS MORGADO", "baseData": "2024-12-02", "usado": 18}, {"nome": "RODRIGO FERNANDES LEMES", "baseData": "2024-12-06", "usado": 18}, {"nome": "GILBERTO LUIZ SILVA DE PAULA", "baseData": "2024-12-11", "usado": 18}, {"nome": "GILSON DE ANDRADE REZENDE NETO", "baseData": "2024-12-12", "usado": 18}, {"nome": "ANDRE LUIZ BERNARDINO", "baseData": "2025-01-06", "usado": 14}, {"nome": "ANDERSON CAMPOS ALMEIDA SANTOS", "baseData": "2025-01-09", "usado": 18}, {"nome": "WILLIAM DE OLIVEIRA SILVA", "baseData": "2025-02-01", "usado": 0}, {"nome": "REGIS SADAO MACIEL TAKAYAMA", "baseData": "2025-02-01", "usado": 18.0}, {"nome": "ALACIR SILVESTRE DE FARIA", "baseData": "2025-02-25", "usado": 18.0}, {"nome": "NATANA CRISTINA DOS SANTOS", "baseData": "2025-03-13", "usado": 14}, {"nome": "HENRIQUE ALVES DOS SANTOS", "baseData": "2025-03-14", "usado": 14}, {"nome": "ADRIANO SANTOS", "baseData": "2025-04-01", "usado": 0}, {"nome": "BRUNO RODRIGO RIBAS", "baseData": "2025-04-06", "usado": 18.0}, {"nome": "VICTOR DA SILVA ESTEVAO", "baseData": "2025-04-22", "usado": 0}, {"nome": "BRUNO DINIZ TAVARES", "baseData": "2025-05-03", "usado": 18}, {"nome": "ALINE CRISTINA DE ANDRADE RODRIGUES", "baseData": "2025-10-06", "usado": 0}];
+
+// ---------- Storage ----------
+function colaboradoresCollection(){ return dbInstance.collection('ferias-app-colaboradores'); }
+
+async function loadData(){
+  colaboradores = [];
+  let carregouRemoto = false;
+  if(firebaseReady && currentUser){
+    try{
+      const snap = await colaboradoresCollection().get();
+      snap.forEach(doc => colaboradores.push({ id: doc.id, ...doc.data() }));
+      carregouRemoto = true;
+    }catch(e){ /* cai para o fallback abaixo */ }
+  }
+  if(!carregouRemoto){
+    try{
+      const res = await storageGet(STORAGE_KEY, false);
+      colaboradores = res ? JSON.parse(res.value) : [];
+    }catch(e){ colaboradores = []; }
+  }
+  colaboradores.forEach(c => {
+    c.lancamentos = c.lancamentos || [];
+    c.historico = c.historico || [];
+    c.periodosFechados = c.periodosFechados || 0;
+    // Migração: status de aprovação passa a ser por parcela, não mais do
+    // colaborador inteiro. Parcelas antigas sem status/id ganham um id e
+    // herdam o status antigo do colaborador (só pra não perder a informação).
+    c.lancamentos.forEach(l => {
+      if(!l.id) l.id = gerarId('l');
+      if(l.status === undefined) l.status = c.statusAprovacao || null;
+    });
+  });
+
+  try{
+    const th = await storageGet(THRESHOLD_KEY, false);
+    if(th){ thresholdAmarelo = parseInt(th.value, 10); $('thresholdSelect').value = String(thresholdAmarelo); }
+  }catch(e){}
+  try{
+    const r = await storageGet(REGRAS_KEY, false);
+    if(r) regras = { ...REGRAS_PADRAO, ...JSON.parse(r.value) };
+  }catch(e){}
+  await aplicarSeedSeNecessario();
+  // Rede de segurança: garante id/status em qualquer parcela que ainda não tenha
+  // (inclusive as recém-criadas pelo seed), independentemente de onde vieram.
+  colaboradores.forEach(c => {
+    (c.lancamentos || []).forEach(l => {
+      if(!l.id) l.id = gerarId('l');
+      if(l.status === undefined) l.status = null;
+    });
+  });
+  render();
+}
+
+async function aplicarSeedSeNecessario(){
+  try{
+    const jaAplicado = await storageGet(SEED_KEY, false);
+    if(jaAplicado) return;
+  }catch(e){ /* não aplicado ainda */ }
+
+  const nomesExistentes = new Set(colaboradores.map(c => c.nome.trim().toLowerCase()));
+  const novos = [];
+  SEED_INICIAL.forEach((item, i) => {
+    const chave = item.nome.trim().toLowerCase();
+    if(nomesExistentes.has(chave)) return; // já existe, não duplica
+    const novo = {
+      id: gerarId('seed'),
+      nome: item.nome, baseData: item.baseData, periodosFechados: 0,
+      lancamentos: item.usado > 0 ? [{ id: gerarId('l'), dias: item.usado, data: item.baseData, dataPrevista: item.baseData, status: null }] : [],
+      statusAprovacao: null,
+      obs: 'Importado de planilha com saldo (dados de referência de jan/2025)',
+      historico: []
+    };
+    colaboradores.push(novo);
+    novos.push(novo);
+    nomesExistentes.add(chave);
+  });
+
+  if(novos.length > 0){
+    await salvarVariosColaboradores(novos);
+    toast(`${novos.length} colaborador(es) importado(s) da planilha de referência`);
+  }
+  try{ await storageSet(SEED_KEY, 'true', false); }catch(e){}
+}
+
+/* Persistência dos colaboradores: cada um é um DOCUMENTO PRÓPRIO no Firestore
+   (coleção ferias-app-colaboradores), não um item dentro de um array gigante
+   num único documento — isso evita esbarrar no limite de 1MB por documento
+   conforme a lista cresce. Fora do Firebase (dentro do Claude, ou se a conexão
+   falhar), cai para o array único salvo via storageGet/storageSet (localStorage
+   ou window.storage), que não tem esse limite prático para uso individual. */
+async function saveColaborador(c){
+  if(firebaseReady && currentUser){
+    try{
+      const { id, ...dados } = c;
+      await colaboradoresCollection().doc(id).set(dados);
+      return;
+    }catch(e){ /* cai para o fallback abaixo */ }
+  }
+  try{ await storageSet(STORAGE_KEY, JSON.stringify(colaboradores), false); }
+  catch(e){ toast('Erro ao salvar dados'); }
+}
+
+async function salvarVariosColaboradores(lista){
+  if(firebaseReady && currentUser){
+    try{
+      const grupos = [];
+      for(let i = 0; i < lista.length; i += 450) grupos.push(lista.slice(i, i + 450));
+      for(const grupo of grupos){
+        const batch = dbInstance.batch();
+        grupo.forEach(c => {
+          const { id, ...dados } = c;
+          batch.set(colaboradoresCollection().doc(id), dados);
+        });
+        await batch.commit();
+      }
+      return;
+    }catch(e){ /* cai para o fallback abaixo */ }
+  }
+  try{ await storageSet(STORAGE_KEY, JSON.stringify(colaboradores), false); }
+  catch(e){ toast('Erro ao salvar dados'); }
+}
+
+async function excluirColaboradorRemoto(id){
+  if(firebaseReady && currentUser){
+    try{ await colaboradoresCollection().doc(id).delete(); return; }
+    catch(e){ /* cai para o fallback abaixo */ }
+  }
+  try{ await storageSet(STORAGE_KEY, JSON.stringify(colaboradores), false); }
+  catch(e){ toast('Erro ao salvar dados'); }
+}
+
+async function apagarTodosRemoto(){
+  if(firebaseReady && currentUser){
+    try{
+      const snap = await colaboradoresCollection().get();
+      const ids = []; snap.forEach(doc => ids.push(doc.id));
+      const grupos = [];
+      for(let i = 0; i < ids.length; i += 450) grupos.push(ids.slice(i, i + 450));
+      for(const grupo of grupos){
+        const batch = dbInstance.batch();
+        grupo.forEach(id => batch.delete(colaboradoresCollection().doc(id)));
+        await batch.commit();
+      }
+      return;
+    }catch(e){ /* cai para o fallback abaixo */ }
+  }
+  try{ await storageSet(STORAGE_KEY, JSON.stringify(colaboradores), false); }
+  catch(e){ toast('Erro ao salvar dados'); }
+}
+
+async function saveThreshold(){ try{ await storageSet(THRESHOLD_KEY, String(thresholdAmarelo), false); }catch(e){} }
+async function saveRegras(){ try{ await storageSet(REGRAS_KEY, JSON.stringify(regras), false); }catch(e){} }
+
+// ---------- Render ----------
+function render(){
+  const busca = $('search').value.trim().toLowerCase();
+  const ordenacao = $('sortSelect').value;
+
+  const enriquecidos = colaboradores.map(c => ({ ...c, status: calcularStatus(c) }));
+
+  const counts = {all: enriquecidos.length, red:0, yellow:0, green:0, segundo:0};
+  enriquecidos.forEach(c => {
+    if(!c.status.emAquisicao) counts[c.status.cor]++;
+    const alertaMultiplo = c.status.ciclosAbertos >= 2;
+    const alertaProximoVenc = !c.status.emAquisicao && !alertaMultiplo && c.status.diasParaProximoVencimento !== null
+      && c.status.diasParaProximoVencimento >= 0 && c.status.diasParaProximoVencimento <= regras.alertaSegundoPeriodoDias;
+    if(alertaProximoVenc) counts.segundo++;
+  });
+  $('cnt-all').textContent = counts.all;
+  $('cnt-red').textContent = counts.red;
+  $('cnt-yellow').textContent = counts.yellow;
+  $('cnt-green').textContent = counts.green;
+  $('cnt-segundo').textContent = counts.segundo;
+  atualizarMiniChips();
+
+  document.querySelectorAll('.chip').forEach(ch => ch.classList.toggle('active', ch.dataset.filter === filtroAtual));
+
+  let filtrados = enriquecidos.filter(c=>{
+    if(filtroAtual === 'segundo'){
+      const alertaMultiplo = c.status.ciclosAbertos >= 2;
+      const alertaProximoVenc = !c.status.emAquisicao && !alertaMultiplo && c.status.diasParaProximoVencimento !== null
+        && c.status.diasParaProximoVencimento >= 0 && c.status.diasParaProximoVencimento <= regras.alertaSegundoPeriodoDias;
+      if(!alertaProximoVenc) return false;
+    } else if(filtroAtual !== 'all' && (c.status.emAquisicao || c.status.cor !== filtroAtual)) return false;
+    if(busca && !c.nome.toLowerCase().includes(busca)) return false;
+    return true;
+  });
+
+  if(ordenacao === 'urgencia') filtrados.sort((a,b) => a.status.diasRestantes - b.status.diasRestantes);
+  else filtrados.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  const list = $('list');
+  if(filtrados.length === 0){
+    list.innerHTML = '<div class="empty">Nenhum colaborador encontrado.<br>Toque em "+" para adicionar ou em "Importar" para trazer sua planilha.</div>';
+    return;
+  }
+
+  list.innerHTML = filtrados.map(c=>{
+    const st = c.status;
+    let pillTxt, pillClass;
+    if(st.emAquisicao){ pillTxt = 'EM AQUISIÇÃO'; pillClass = 'aquisicao'; }
+    else if(st.diasAteLimite <= 0){ pillTxt = `VENCIDO HÁ ${Math.abs(st.diasAteLimite)}D`; pillClass = st.cor; }
+    else if(st.eventoMaisProximo === 'proximoPeriodo'){
+      pillTxt = st.diasParaProximoVencimento === 0 ? '2º PERÍODO VENCE HOJE' : `2º PERÍODO EM ${st.diasParaProximoVencimento}D`;
+      pillClass = st.cor;
+    } else {
+      pillTxt = st.diasAteLimite === 0 ? 'VENCE HOJE' : `${st.diasAteLimite}D RESTANTES`;
+      pillClass = st.cor;
+    }
+    const alertaMultiplo = st.ciclosAbertos >= 2;
+    const alertaProximoVenc = !st.emAquisicao && !alertaMultiplo && st.diasParaProximoVencimento !== null
+      && st.diasParaProximoVencimento >= 0 && st.diasParaProximoVencimento <= regras.alertaSegundoPeriodoDias;
+
+    const parcelasHtml = (c.lancamentos && c.lancamentos.length)
+      ? `<div class="parcelas-lista">${c.lancamentos.map(l => {
+          const statusTxt = l.status === 'aguardando' ? '<span class="parcela-status aguardando">🕓 Aguardando RH</span>'
+            : l.status === 'aprovada' ? '<span class="parcela-status aprovada">✅ Aprovada</span>'
+            : '<span class="parcela-status atencao">⚠️ Atenção — sem status</span>';
+          return `<div class="parcela-item">
+            <span>${fmtDias(l.dias)}d (início ${fmtData(parseISO(l.dataPrevista))})</span>
+            ${statusTxt}
+            <button class="icon-btn icon-btn-sm" data-action="editar-parcela" data-id="${c.id}" data-parcela="${l.id}" title="Editar parcela">✎</button>
+          </div>`;
+        }).join('')}</div>`
+      : '';
+
+    const hojeRef = new Date(); hojeRef.setHours(0,0,0,0);
+    // Busca a próxima data programada tanto nas parcelas em aberto quanto no
+    // último período já encerrado — assim, se o encerramento automático (por
+    // aprovação) fechar um período com data futura, o aviso continua visível.
+    const ultimoHistorico = (c.historico && c.historico.length) ? c.historico[c.historico.length - 1] : null;
+    const parcelasParaProxima = [...(c.lancamentos || []), ...((ultimoHistorico && ultimoHistorico.lancamentos) || [])];
+    const proximaPrevista = parcelasParaProxima
+      .map(l => parseISO(l.dataPrevista))
+      .filter(d => d >= hojeRef)
+      .sort((a,b) => a - b)[0];
+
+    // Quando o saldo já zerou E todas as parcelas lançadas já aconteceram (nenhuma
+    // no futuro), não há mais motivo pra manter isso discreto — não tem "férias
+    // futuras" escondidas, é só faltar um clique em "Encerrar manualmente".
+    const todasParcelasPassadas = (c.lancamentos && c.lancamentos.length > 0)
+      && c.lancamentos.every(l => addDays(parseISO(l.dataPrevista), l.dias) <= hojeRef);
+
+    const saldoBoxes = st.emAquisicao
+      ? `<div class="saldo-box acumulo"><div class="l">Direito acumulado (em aquisição)</div><div class="v">${fmtDias(st.diasAcumulados)} dias</div></div>`
+      : st.saldoVencido > 0
+        ? `<div class="saldo-box vencido"><div class="l">Saldo vencido${st.ciclosAbertos > 1 ? ` (${st.ciclosAbertos} períodos)` : ''}</div><div class="v">${fmtDias(st.saldoVencido)} dias</div></div>
+           <div class="saldo-box proximo"><div class="l">Direito próx. período</div><div class="v">${fmtDias(st.saldoProximo)} dias</div></div>`
+        : todasParcelasPassadas
+          ? `<div class="saldo-pronto-encerrar">
+               ✅ Todas as parcelas já ocorreram e o saldo está zerado — só falta encerrar.
+               <button class="btn btn-primary btn-sm" data-action="encerrar" data-id="${c.id}" style="margin-top:8px;">Encerrar agora</button>
+             </div>
+             <div class="saldo-box proximo"><div class="l">Direito próx. período</div><div class="v">${fmtDias(st.saldoProximo)} dias</div></div>`
+          : `<div class="saldo-concluido">✅ Saldo do período vencido já utilizado — aguardando encerramento formal (ainda há parcela futura programada)</div>
+             <div class="saldo-box proximo"><div class="l">Direito próx. período</div><div class="v">${fmtDias(st.saldoProximo)} dias</div></div>`;
+
+    const podeLancar = !st.emAquisicao && st.saldoVencido > 0;
+
+    return `
+    <div class="card ${st.emAquisicao ? 'aquisicao' : st.cor}" data-id="${c.id}">
+      <div class="card-top">
+        <div class="info">
+          <div class="nome">${escapeHtml(c.nome)}</div>
+          ${alertaMultiplo ? `<div class="alerta-multiplo">⚠️ ${st.ciclosAbertos} períodos vencidos empilhados sem uso — risco de indenização em dobro</div>` : ''}
+          ${alertaProximoVenc ? `<div class="alerta-proximo">⏳ Faltam ${st.diasParaProximoVencimento}d para o período seguinte também vencer (ficaria com ${st.ciclosAbertos + 1} períodos empilhados)</div>` : ''}
+          <div class="meta">
+            <span>Data-base: <b>${fmtData(parseISO(c.baseData))}</b></span>
+            <span>Venc. período mais antigo: <b>${fmtData(st.vencPeriodo)}</b></span>
+            <span>Limite (prazo legal): <b>${fmtData(st.limite)}</b></span>
+            ${!st.emAquisicao ? `<span>Próximo período vence em: <b>${fmtData(addMonths(st.inicioAcumulo, 12))}</b></span>` : ''}
+            ${c.obs ? `<span>${escapeHtml(c.obs)}</span>` : ''}
+          </div>
+          ${proximaPrevista ? `<div class="prox-ferias">🗓 Próximas férias programadas: <b>${fmtData(proximaPrevista)}</b></div>` : ''}
+          <div class="saldo-row">${saldoBoxes}</div>
+          ${parcelasHtml}
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+          <span class="status-pill ${pillClass}">${pillTxt}</span>
+          <div class="card-actions">
+            <button class="icon-btn" data-action="editar" data-id="${c.id}">✎</button>
+            <button class="icon-btn" data-action="excluir" data-id="${c.id}">🗑</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-bottom">
+        <span></span>
+        <div class="card-bottom-actions">
+          <button class="link-btn" data-action="historico" data-id="${c.id}" ${(c.historico && c.historico.length) ? '' : 'disabled'}>Ver histórico</button>
+          <button class="link-btn" data-action="encerrar" data-id="${c.id}" ${st.emAquisicao ? 'disabled' : ''}>Encerrar manualmente</button>
+          <button class="btn btn-primary btn-sm" data-action="lancar" data-id="${c.id}" ${podeLancar ? '' : 'disabled'}>Lançar férias</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ---------- CRUD colaborador ----------
+function abrirFormNovo(){
+  $('formTitle').textContent = 'Novo colaborador';
+  $('editId').value = ''; $('fNome').value = ''; $('fData').value = ''; $('fObs').value = '';
+  $('modalForm').classList.add('open');
+}
+function editarColaborador(id){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  $('formTitle').textContent = 'Editar colaborador';
+  $('editId').value = c.id; $('fNome').value = c.nome; $('fData').value = c.baseData; $('fObs').value = c.obs || '';
+  $('modalForm').classList.add('open');
+}
+async function excluirColaborador(id){
+  const c = colaboradores.find(x => x.id === id);
+  const ok = await askConfirm(`Excluir ${c ? c.nome : 'este colaborador'}? Essa ação não pode ser desfeita.`, 'Excluir colaborador');
+  if(!ok) return;
+  colaboradores = colaboradores.filter(x => x.id !== id);
+  await excluirColaboradorRemoto(id); render(); toast('Colaborador excluído');
+}
+async function salvarForm(){
+  const nome = $('fNome').value.trim();
+  const dataStr = $('fData').value;
+  const obs = $('fObs').value.trim();
+  const editId = $('editId').value;
+  if(!nome){ toast('Informe o nome'); return; }
+  if(!dataStr){ toast('Informe a data-base'); return; }
+  let alvo;
+  if(editId){
+    alvo = colaboradores.find(x => x.id === editId);
+    alvo.nome = nome; alvo.baseData = dataStr; alvo.obs = obs;
+  } else {
+    alvo = {
+      id: gerarId('c'),
+      nome, baseData: dataStr, periodosFechados: 0,
+      lancamentos: [], statusAprovacao: null, obs, historico: []
+    };
+    colaboradores.push(alvo);
+  }
+  await saveColaborador(alvo); $('modalForm').classList.remove('open'); render(); toast('Salvo com sucesso');
+}
+async function toggleAprovacao(id, valor){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  c.statusAprovacao = (c.statusAprovacao === valor) ? null : valor;
+  await saveColaborador(c); render();
+}
+
+// ---------- Encerrar período ----------
+function detalharCiclosAbertos(c){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const base = parseISO(c.baseData);
+  const diasDireito = 12 * regras.diasPorMes;
+  const totalCiclosCompletos = Math.floor(mesesEntre(base, hoje) / 12);
+  const k = c.periodosFechados;
+  const ciclosAbertos = Math.max(0, totalCiclosCompletos - k);
+  if(ciclosAbertos === 0) return [];
+
+  let restanteGozado = (c.lancamentos || []).reduce((s,l) => s + l.dias, 0);
+  const ciclos = [];
+  for(let i = 0; i < ciclosAbertos; i++){
+    const idxCiclo = k + i;
+    const inicio = addMonths(base, 12 * idxCiclo);
+    const vencimento = addMonths(inicio, 12);
+    const limite = addMonths(vencimento, regras.mesesAteLimite);
+    const consumidoNesteCiclo = Math.min(diasDireito, restanteGozado);
+    restanteGozado -= consumidoNesteCiclo;
+    ciclos.push({
+      indice: i, inicio, vencimento, limite,
+      diasDireito, diasGozados: consumidoNesteCiclo,
+      saldo: diasDireito - consumidoNesteCiclo
+    });
+  }
+  return ciclos;
+}
+
+function encerrarPeriodo(c, quantosCiclos){
+  const status = calcularStatus(c);
+  c.historico = c.historico || [];
+  c.historico.push({
+    dataConclusao: new Date().toISOString().slice(0,10),
+    diasDireito: status.diasDireito * quantosCiclos, diasGozados: status.diasGozados, parcelas: (c.lancamentos || []).length,
+    ciclosFechados: quantosCiclos,
+    lancamentos: (c.lancamentos || []).map(l => ({ id: l.id, dias: l.dias, dataPrevista: l.dataPrevista, status: l.status || null })) // guarda id, data e status de cada parcela
+  });
+  c.periodosFechados += quantosCiclos;
+  c.lancamentos = [];
+  c.statusAprovacao = null;
+}
+
+// Fecha automaticamente só a quantidade de períodos que os dias já lançados
+// realmente cobrem por completo — nunca tudo ou nada. Se uma parcela cruza a
+// fronteira entre um período que fecha e outro que continua aberto, ela é
+// fatiada, preservando a data e o status de aprovação em cada pedaço.
+// Fecha automaticamente só a quantidade de períodos que os dias já APROVADOS
+// cobrem por completo — parcelas "aguardando" ou sem status nunca entram nessa
+// conta e nunca são tocadas, mesmo que a soma total (aprovadas + não aprovadas)
+// já desse pra fechar um período. Só o que já tem aval do RH conta pra fechar.
+function fecharCiclosCompletos(c){
+  const status = calcularStatus(c);
+  if(status.emAquisicao) return 0;
+  const diasDireito = status.diasDireito;
+  const todos = c.lancamentos || [];
+  const naoAprovados = todos.filter(l => l.status !== 'aprovada');
+  const aprovados = [...todos.filter(l => l.status === 'aprovada')]
+    .sort((a,b) => (a.dataPrevista||'').localeCompare(b.dataPrevista||''));
+  const totalAprovados = aprovados.reduce((s,l) => s + l.dias, 0);
+  const quantosFechar = Math.min(status.ciclosAbertos, Math.floor(totalAprovados / diasDireito));
+  if(quantosFechar <= 0) return 0;
+
+  let restante = quantosFechar * diasDireito;
+  const fechados = [];
+  const aprovadosQueFicam = [];
+
+  aprovados.forEach(l => {
+    if(restante <= 0){ aprovadosQueFicam.push(l); return; }
+    if(l.dias <= restante){
+      fechados.push(l);
+      restante -= l.dias;
+    } else {
+      fechados.push({ ...l, dias: restante });
+      aprovadosQueFicam.push({ ...l, dias: l.dias - restante });
+      restante = 0;
+    }
+  });
+
+  c.historico = c.historico || [];
+  c.historico.push({
+    dataConclusao: new Date().toISOString().slice(0,10),
+    diasDireito: quantosFechar * diasDireito,
+    diasGozados: quantosFechar * diasDireito,
+    parcelas: fechados.length,
+    ciclosFechados: quantosFechar,
+    lancamentos: fechados.map(l => ({ id: l.id, dias: l.dias, dataPrevista: l.dataPrevista, status: l.status || null }))
+  });
+  c.periodosFechados += quantosFechar;
+  // Preserva intactas todas as parcelas não aprovadas (aguardando/sem status) —
+  // elas nunca fazem parte do fechamento, só o que sobrou de aprovado entra aqui.
+  c.lancamentos = [...naoAprovados, ...aprovadosQueFicam];
+  return quantosFechar;
+}
+
+function abrirEncerrar(id){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  const status = calcularStatus(c);
+  if(status.emAquisicao){ toast('Este período ainda está em aquisição.'); return; }
+
+  const ciclos = detalharCiclosAbertos(c);
+  $('encerrarId').value = id;
+  $('encerrarNome').textContent = c.nome;
+  $('encerrarLista').innerHTML = ciclos.map(ci => {
+    // O vencimento do PRÓXIMO período (que empilharia mais um) é sempre 8 meses
+    // antes do limite legal deste (12 meses de ciclo vs 20 meses de limite) —
+    // então o limite legal sozinho esconde esse risco mais próximo.
+    const proxVencimento = (ci.indice + 1 < ciclos.length)
+      ? ciclos[ci.indice + 1].vencimento
+      : addMonths(status.inicioAcumulo, 12);
+    const empilhaAntesDoLimite = proxVencimento < ci.limite;
+
+    return `
+    <div class="ciclo-card">
+      <div class="ciclo-top">
+        <span class="ciclo-titulo">${ci.indice + 1}º período em aberto</span>
+        <span class="ciclo-saldo">${fmtDias(ci.saldo)} dias de saldo</span>
+      </div>
+      <div class="ciclo-datas">
+        <span>Início: <b>${fmtData(ci.inicio)}</b></span>
+        <span>Venceu em: <b>${fmtData(ci.vencimento)}</b></span>
+        <span>Limite: <b>${fmtData(ci.limite)}</b></span>
+      </div>
+      ${empilhaAntesDoLimite ? `<div class="alerta-proximo" style="margin-top:8px;">⏳ Antes desse limite, o período seguinte já vence em <b>${fmtData(proxVencimento)}</b> — ficaria com mais 1 período empilhado se nada for feito até lá.</div>` : ''}
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" style="flex:1;" data-action="lancar-de-encerrar" data-id="${c.id}">
+          Programar férias
+        </button>
+        <button class="btn btn-primary btn-sm" style="flex:1;" data-action="encerrar-ate" data-id="${c.id}" data-indice="${ci.indice}">
+          Encerrar até aqui (${ci.indice + 1}/${ciclos.length})
+        </button>
+      </div>
+      ${ci.indice > 0 ? `<div class="helptext" style="margin-top:6px;">Como as parcelas descontam sempre do período mais antigo primeiro, programar aqui consome o saldo do 1º período em aberto até ele esgotar.</div>` : ''}
+    </div>
+  `;
+  }).join('') + `
+    <div class="ciclo-card" style="border-style:dashed; border-color:var(--ink-dim);">
+      <div class="ciclo-top">
+        <span class="ciclo-titulo" style="color:var(--ink-dim);">Próximo período (em aquisição)</span>
+        <span class="ciclo-saldo" style="color:var(--ink-dim);">${fmtDias(status.saldoProximo)} dias acumulados</span>
+      </div>
+      <div class="ciclo-datas">
+        <span>Início: <b>${fmtData(status.inicioAcumulo)}</b></span>
+      </div>
+      <div class="helptext" style="margin-top:6px;">
+        Ainda não venceu — acumula 2,5 dias por mês trabalhado desde que o último período (acima) venceu. Some conforme os meses forem fechando.
+      </div>
+    </div>
+  `;
+  $('modalEncerrar').classList.add('open');
+}
+
+function abrirHistorico(id){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c || !c.historico || !c.historico.length) return;
+  $('historicoNome').textContent = c.nome;
+  const itens = [...c.historico].reverse(); // mais recente primeiro
+  $('historicoLista').innerHTML = itens.map((h, idx) => {
+    const parcelasHtml = (h.lancamentos && h.lancamentos.length)
+      ? h.lancamentos.map(l => `<span>${fmtDias(l.dias)}d a partir de ${fmtData(parseISO(l.dataPrevista))}</span>`).join('')
+      : '<span>Sem parcelas registradas (encerrado sem uso do saldo)</span>';
+    const ehMaisRecente = idx === 0;
+    return `
+      <div class="ciclo-card">
+        <div class="ciclo-top">
+          <span class="ciclo-titulo">Encerrado em ${fmtData(parseISO(h.dataConclusao))}</span>
+          <span class="ciclo-saldo">${fmtDias(h.diasGozados)} de ${fmtDias(h.diasDireito)} dias usados</span>
+        </div>
+        <div class="ciclo-datas" style="flex-direction:column; align-items:flex-start; gap:4px;">${parcelasHtml}</div>
+        ${ehMaisRecente ? `<button class="btn btn-ghost btn-sm" style="width:100%; margin-top:8px;" data-action="reabrir-periodo" data-id="${c.id}">↩️ Reabrir este encerramento</button>` : ''}
+      </div>
+    `;
+  }).join('');
+  $('modalHistorico').classList.add('open');
+}
+
+async function reabrirUltimoPeriodo(id){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c || !c.historico || !c.historico.length) return;
+  const ultimo = c.historico[c.historico.length - 1];
+  const ok = await askConfirm(
+    `Isso vai desfazer o encerramento de ${fmtData(parseISO(ultimo.dataConclusao))} de ${c.nome}, restaurando ${fmtDias(ultimo.diasGozados)} dia(s) usado(s) como parcela(s) em aberto novamente. Confirmar?`,
+    'Reabrir período'
+  );
+  if(!ok) return;
+  c.periodosFechados -= (ultimo.ciclosFechados || 1);
+  c.lancamentos = (ultimo.lancamentos || []).map(l => ({ id: l.id || gerarId('l'), dias: l.dias, data: ultimo.dataConclusao, dataPrevista: l.dataPrevista, status: l.status || null }));
+  c.historico.pop();
+  await saveColaborador(c);
+  $('modalHistorico').classList.remove('open');
+  render();
+  toast(`Encerramento de ${c.nome} desfeito — período reaberto`);
+}
+
+function addDays(date, dias){
+  const d = new Date(date);
+  d.setDate(d.getDate() + Math.round(dias));
+  return d;
+}
+
+function calcularListasDashboard(){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const aguardando = [];
+  const aprovadas = [];
+  const emFerias = [];
+  const proximas = [];
+  colaboradores.forEach(c => {
+    (c.lancamentos || []).forEach(l => {
+      if(l.status === 'aguardando') aguardando.push({ colaborador: c, parcela: l });
+      if(l.status === 'aprovada') aprovadas.push({ colaborador: c, parcela: l });
+    });
+    // "Em férias" e "Próximas" só valem pra quem já foi aprovado pelo RH — e
+    // olham tanto nas parcelas em aberto quanto nas de períodos já encerrados
+    // (um fechamento automático pode ter levado uma parcela com data futura
+    // pro histórico, mas ela continua sendo uma férias real e programada).
+    const todasAprovadas = [
+      ...(c.lancamentos || []).filter(l => l.status === 'aprovada'),
+      ...((c.historico || []).flatMap(h => (h.lancamentos || []).filter(l => l.status === 'aprovada')))
+    ];
+    todasAprovadas.forEach(l => {
+      if(!l.dataPrevista) return;
+      const inicio = parseISO(l.dataPrevista);
+      const retorno = addDays(inicio, l.dias);
+      if(retorno < hoje) return;
+      const item = { colaborador: c, inicio, retorno, dias: l.dias };
+      if(inicio <= hoje) emFerias.push(item);
+      else proximas.push(item);
+    });
+  });
+  emFerias.sort((a,b) => a.retorno - b.retorno);
+  proximas.sort((a,b) => a.inicio - b.inicio);
+
+  return { hoje, aguardando, aprovadas, emFerias, proximas };
+}
+
+function atualizarMiniChips(){
+  const { aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  $('miniCntEmFerias').textContent = emFerias.length;
+  $('miniCntProgramada').textContent = proximas.length;
+  $('miniCntAguardando').textContent = aguardando.length;
+  $('miniCntAprovada').textContent = aprovadas.length;
+}
+
+function linhaStatusDash(item, corClasse, comAcoes){
+  const c = item.colaborador, l = item.parcela;
+  const info = `${fmtDias(l.dias)}d — início ${fmtData(parseISO(l.dataPrevista))}`;
+  const acoes = comAcoes ? `
+    <div class="dash-row-acoes">
+      <button class="btn-aprovar" data-action="dash-aprovar" data-id="${c.id}" data-parcela="${l.id}">✓ Aprovar</button>
+      <button class="btn-reprovar" data-action="dash-reprovar" data-id="${c.id}" data-parcela="${l.id}">✕ Reprovar</button>
+    </div>` : '';
+  return `<div class="dash-row ${corClasse}"><span class="dash-nome">${escapeHtml(c.nome)} <span style="color:var(--ink-dim); font-weight:400;">— ${info}</span></span>${acoes}</div>`;
+}
+
+function calcularAlertas(){
+  const lista = [];
+  colaboradores.forEach(c => {
+    const st = calcularStatus(c);
+    const alertaMultiplo = st.ciclosAbertos >= 2;
+    const alertaProximoVenc = !st.emAquisicao && !alertaMultiplo && st.diasParaProximoVencimento !== null
+      && st.diasParaProximoVencimento >= 0 && st.diasParaProximoVencimento <= regras.alertaSegundoPeriodoDias;
+    if(alertaProximoVenc) lista.push({ colaborador: c, dias: st.diasParaProximoVencimento, proxVencimento: addMonths(st.inicioAcumulo, 12) });
+  });
+  lista.sort((a,b) => a.dias - b.dias);
+  return lista;
+}
+
+function calcularMetricasPizza(){
+  const total = colaboradores.length;
+  const { aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+
+  // "Em férias": pessoas únicas (não períodos) atualmente de férias.
+  const idsEmFerias = new Set(emFerias.map(p => p.colaborador.id));
+  const pctEmFerias = total > 0 ? (idsEmFerias.size / total * 100) : 0;
+
+  // Base para aguardando/aprovada = pessoas com alguma férias programada (em curso ou futura).
+  const idsProgramadas = new Set([...emFerias, ...proximas].map(p => p.colaborador.id));
+  const totalProgramadas = idsProgramadas.size;
+  const aguardandoCount = aguardando.filter(item => idsProgramadas.has(item.colaborador.id)).length;
+  const aprovadaCount = aprovadas.filter(item => idsProgramadas.has(item.colaborador.id)).length;
+  const pctAguardando = totalProgramadas > 0 ? (aguardandoCount / totalProgramadas * 100) : 0;
+  const pctAprovada = totalProgramadas > 0 ? (aprovadaCount / totalProgramadas * 100) : 0;
+
+  const alertas = calcularAlertas();
+  const pctAlerta = total > 0 ? (alertas.length / total * 100) : 0;
+
+  return {
+    total, emFeriasCount: idsEmFerias.size, pctEmFerias,
+    totalProgramadas, aguardandoCount, pctAguardando,
+    aprovadaCount, pctAprovada,
+    alertaCount: alertas.length, pctAlerta
+  };
+}
+
+function renderPizza(svgId, percentual, corHex){
+  const r = 15.9155, circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, percentual));
+  const dash = (pct / 100) * circ;
+  document.getElementById(svgId).innerHTML = `
+    <circle cx="18" cy="18" r="${r}" fill="none" stroke="var(--line)" stroke-width="3.2"></circle>
+    <circle cx="18" cy="18" r="${r}" fill="none" stroke="${corHex}" stroke-width="3.2"
+      stroke-dasharray="${dash.toFixed(2)} ${(circ - dash).toFixed(2)}" stroke-linecap="round"></circle>
+  `;
+}
+
+// ---------- Calendário de cobertura ----------
+let calAnoAtual, calMesAtual; // mês: 0-11
+
+function pessoasDeFeriasNoDia(dia){
+  const nomes = [];
+  colaboradores.forEach(c => {
+    // Olha tanto nas parcelas em aberto quanto nas de qualquer período já
+    // encerrado — se o fechamento automático (por aprovação) levou uma parcela
+    // com data futura pro histórico, ela não pode sumir do calendário por isso.
+    const todasParcelas = [
+      ...(c.lancamentos || []),
+      ...((c.historico || []).flatMap(h => h.lancamentos || []))
+    ];
+    todasParcelas.forEach(l => {
+      if(!l.dataPrevista) return;
+      const inicio = parseISO(l.dataPrevista);
+      const retorno = addDays(inicio, l.dias);
+      if(dia >= inicio && dia < retorno) nomes.push(c.nome);
+    });
+  });
+  return [...new Set(nomes)];
+}
+
+function renderCalendario(){
+  const primeiroDia = new Date(calAnoAtual, calMesAtual, 1);
+  const ultimoDia = new Date(calAnoAtual, calMesAtual + 1, 0);
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  $('calTitulo').textContent = `${nomesMes[calMesAtual]} de ${calAnoAtual}`;
+
+  const totalColab = colaboradores.length || 1;
+  const offsetInicio = primeiroDia.getDay(); // 0=domingo
+  const diasNoMes = ultimoDia.getDate();
+
+  let html = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  for(let i = 0; i < offsetInicio; i++) html += `<div class="cal-dia vazio"></div>`;
+
+  for(let dia = 1; dia <= diasNoMes; dia++){
+    const dataDia = new Date(calAnoAtual, calMesAtual, dia);
+    const nomes = pessoasDeFeriasNoDia(dataDia);
+    const qtd = nomes.length;
+    const pct = qtd / totalColab;
+    let nivel = '';
+    if(qtd > 0){
+      nivel = pct >= 0.2 ? 'nivel-alto' : (pct >= 0.08 ? 'nivel-medio' : 'nivel-baixo');
+    }
+    const isHoje = dataDia.getTime() === hoje.getTime();
+    html += `<div class="cal-dia ${qtd > 0 ? 'tem-gente' : ''} ${nivel} ${isHoje ? 'hoje' : ''}" ${qtd > 0 ? `data-action="cal-dia" data-data="${dataDia.toISOString().slice(0,10)}"` : ''}>
+      <span class="cal-num">${dia}</span>
+      ${qtd > 0 ? `<span class="cal-badge">${qtd}</span>` : ''}
+    </div>`;
+  }
+
+  $('calGradeDias').innerHTML = html;
+  $('calDetalheDia').innerHTML = '';
+}
+
+function mostrarDetalheDia(dataISO){
+  const nomes = pessoasDeFeriasNoDia(parseISO(dataISO));
+  $('calDetalheDia').innerHTML = `
+    <div class="pizza-linha" style="margin-top:10px;">
+      <div class="pizza-detalhes">
+        <div class="pizza-titulo">${fmtData(parseISO(dataISO))} — ${nomes.length} pessoa(s) de férias</div>
+        <div class="pizza-nomes" style="max-height:160px;">
+          ${nomes.map(n => `<div class="pizza-nome-linha"><span>${escapeHtml(n)}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function abrirDashboard(){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  $('dashData').textContent = fmtData(hoje);
+  $('dashTotalColaboradores').textContent = colaboradores.length;
+
+  const m = calcularMetricasPizza();
+  const { aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  const chipsNomes = (lista, vazio) => lista.length
+    ? lista.map(nome => `<div class="pizza-nome-linha"><span>${escapeHtml(nome)}</span></div>`).join('')
+    : `<span class="dash-empty">${vazio}</span>`;
+
+  renderPizza('pizzaEmFerias', m.pctEmFerias, '#ff8a3d');
+  $('pizzaPctEmFerias').textContent = `${Math.round(m.pctEmFerias)}%`;
+  $('pizzaSubEmFerias').textContent = `${m.emFeriasCount} de ${m.total} pessoas`;
+  $('pizzaNomesEmFerias').innerHTML = chipsNomes([...new Set(emFerias.map(p => p.colaborador.nome))], 'Ninguém em férias no momento.');
+
+  renderPizza('pizzaAguardando', m.pctAguardando, '#4d9eff');
+  $('pizzaPctAguardando').textContent = `${Math.round(m.pctAguardando)}%`;
+  $('pizzaSubAguardando').textContent = `${m.aguardandoCount} de ${m.totalProgramadas} programadas`;
+  $('pizzaNomesAguardando').innerHTML = aguardando.length
+    ? aguardando.map(item => `<div class="pizza-nome-linha">
+        <span>${escapeHtml(item.colaborador.nome)} — ${fmtDias(item.parcela.dias)}d (${fmtData(parseISO(item.parcela.dataPrevista))})</span>
+        <div class="dash-row-acoes">
+          <button class="btn-aprovar" data-action="dash-aprovar" data-id="${item.colaborador.id}" data-parcela="${item.parcela.id}">✓</button>
+          <button class="btn-reprovar" data-action="dash-reprovar" data-id="${item.colaborador.id}" data-parcela="${item.parcela.id}">✕</button>
+        </div>
+      </div>`).join('')
+    : '<span class="dash-empty">Ninguém aguardando aprovação no momento.</span>';
+
+  renderPizza('pizzaAprovada', m.pctAprovada, '#b07cff');
+  $('pizzaPctAprovada').textContent = `${Math.round(m.pctAprovada)}%`;
+  $('pizzaSubAprovada').textContent = `${m.aprovadaCount} de ${m.totalProgramadas} programadas`;
+  $('pizzaNomesAprovada').innerHTML = chipsNomes(aprovadas.map(item => `${item.colaborador.nome} — ${fmtDias(item.parcela.dias)}d`), 'Nenhuma férias aprovada no momento.');
+
+  renderPizza('pizzaAlerta', m.pctAlerta, '#f4c430');
+  $('pizzaPctAlerta').textContent = `${Math.round(m.pctAlerta)}%`;
+  $('pizzaSubAlerta').textContent = `${m.alertaCount} de ${m.total} pessoas`;
+  $('pizzaNomesAlerta').innerHTML = chipsNomes(calcularAlertas().map(a => a.colaborador.nome), 'Ninguém em alerta no momento.');
+
+  calAnoAtual = hoje.getFullYear();
+  calMesAtual = hoje.getMonth();
+  renderCalendario();
+
+  $('modalDashboard').classList.add('open');
+}
+
+let dashExpTabAtual = 'emferias';
+
+function renderDashExpandido(){
+  const { hoje, aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  const cont = $('dashExpConteudo');
+
+  if(dashExpTabAtual === 'emferias'){
+    cont.innerHTML = emFerias.length
+      ? emFerias.map(p => `<div class="dash-row b-emferias"><span class="dash-nome">${escapeHtml(p.colaborador.nome)}</span></div>`).join('')
+      : '<div class="dash-empty">Ninguém em férias no momento.</div>';
+  } else if(dashExpTabAtual === 'proximas'){
+    cont.innerHTML = proximas.length
+      ? proximas.map(p => `<div class="dash-row b-programada"><span class="dash-nome">${escapeHtml(p.colaborador.nome)}</span></div>`).join('')
+      : '<div class="dash-empty">Nenhuma férias programada para o futuro.</div>';
+  } else if(dashExpTabAtual === 'aguardando'){
+    cont.innerHTML = aguardando.length
+      ? aguardando.map(item => linhaStatusDash(item, 'b-aguardando', true)).join('')
+      : '<div class="dash-empty">Ninguém aguardando aprovação no momento.</div>';
+  } else if(dashExpTabAtual === 'aprovada'){
+    cont.innerHTML = aprovadas.length
+      ? aprovadas.map(item => linhaStatusDash(item, 'b-aprovada', false)).join('')
+      : '<div class="dash-empty">Nenhuma férias aprovada no momento.</div>';
+  } else if(dashExpTabAtual === 'alerta'){
+    const alertas = calcularAlertas();
+    cont.innerHTML = alertas.length
+      ? alertas.map(a => `<div class="dash-row" style="border-left-color:var(--amarelo);">
+          <span class="dash-nome">${escapeHtml(a.colaborador.nome)}</span>
+          <span class="dash-info">2º período vence em <b>${fmtData(a.proxVencimento)}</b><br>faltam <b>${a.dias}d</b></span>
+        </div>`).join('')
+      : '<div class="dash-empty">Ninguém em alerta de 2º período no momento.</div>';
+  }
+}
+
+const TITULOS_DASH_TAB = {
+  emferias: '🟢 Em férias agora',
+  proximas: '📅 Próximas férias',
+  aguardando: '🕓 Aguardando aprovação do RH',
+  aprovada: '✅ Aprovadas',
+  alerta: '⏳ Em alerta (2º período próximo)'
+};
+
+function abrirDashExpandido(tab){
+  $('modalDashboard').classList.remove('open');
+  dashExpTabAtual = tab || 'emferias';
+  $('dashExpTitulo').textContent = TITULOS_DASH_TAB[dashExpTabAtual] || 'Detalhamento';
+  renderDashExpandido();
+  $('modalDashExpandido').classList.add('open');
+}
+
+async function dashAprovar(id, parcelaId){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  const l = (c.lancamentos || []).find(p => p.id === parcelaId);
+  if(!l) return;
+  l.status = 'aprovada';
+  let msgExtra = '';
+  const fechados = fecharCiclosCompletos(c);
+  if(fechados > 0) msgExtra = ` e ${fechados} período(s) encerrado(s) automaticamente`;
+  await saveColaborador(c);
+  if($('modalDashExpandido').classList.contains('open')) renderDashExpandido();
+  if($('modalDashboard').classList.contains('open')) abrirDashboard();
+  render();
+  toast(`${c.nome} aprovado(a)${msgExtra}`);
+}
+
+async function dashReprovar(id, parcelaId){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  const l = (c.lancamentos || []).find(p => p.id === parcelaId);
+  if(!l) return;
+  const ok = await askConfirm(`Reprovar essa parcela de férias de ${c.nome}? Ela volta para o card principal sem status de aprovação, seguindo as mesmas regras de sempre.`, 'Reprovar');
+  if(!ok) return;
+  l.status = null;
+  await saveColaborador(c);
+  if($('modalDashExpandido').classList.contains('open')) renderDashExpandido();
+  if($('modalDashboard').classList.contains('open')) abrirDashboard();
+  render();
+  toast(`Parcela de ${c.nome} voltou sem status`);
+}
+
+async function confirmarEncerrarAte(id, indice){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  const ciclos = detalharCiclosAbertos(c);
+  const quantosCiclos = indice + 1;
+  const saldoQuePerde = ciclos.slice(0, quantosCiclos).reduce((s,ci) => s + ci.saldo, 0);
+
+  const hojeRef = new Date(); hojeRef.setHours(0,0,0,0);
+  const temParcelaFutura = (c.lancamentos || []).some(l => parseISO(l.dataPrevista) >= hojeRef);
+
+  let msg = saldoQuePerde > 0
+    ? `Isso vai encerrar ${quantosCiclos} período(s) de ${c.nome}, com ${fmtDias(saldoQuePerde)} dias de saldo ainda não usados. O registro fica salvo no histórico. Confirmar?`
+    : `Encerrar ${quantosCiclos} período(s) de ${c.nome}? O registro fica salvo no histórico.`;
+  if(temParcelaFutura){
+    msg += ' Atenção: existe pelo menos uma parcela programada para uma data futura — ela continua visível no card mesmo depois de encerrado, mas passa a fazer parte do histórico.';
+  }
+
+  const ok = await askConfirm(msg, 'Encerrar período');
+  if(!ok) return;
+  encerrarPeriodo(c, quantosCiclos);
+  await saveColaborador(c);
+  $('modalEncerrar').classList.remove('open');
+  render();
+  toast('Período(s) encerrado(s) e registrado(s) no histórico');
+}
+
+// ---------- Lançar férias ----------
+function abrirLancar(id){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  const status = calcularStatus(c);
+  if(status.emAquisicao){ toast('Este período ainda está em aquisição — sem saldo vencido disponível.'); return; }
+  $('lancarId').value = id;
+  $('lancarNome').textContent = c.nome;
+  $('lancarSaldoTxt').textContent = fmtDias(status.saldoVencido);
+  $('lancarParcelasTxt').textContent = `${(c.lancamentos||[]).length}/${regras.maxParcelas}`;
+  $('lancarDias').value = '';
+  $('lancarDataPrevista').value = '';
+  $('lancarErro').classList.remove('show');
+  $('lancarStatusEscolhido').value = '';
+  atualizarBotoesAprovacaoLancar();
+  $('modalLancar').classList.add('open');
+}
+
+function atualizarBotoesAprovacaoLancar(){
+  const escolhido = $('lancarStatusEscolhido').value;
+  $('lancarAprovacaoBtns').querySelectorAll('.aprov-btn').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.valor === escolhido);
+    btn.classList.toggle(btn.dataset.valor, btn.dataset.valor === escolhido);
+  });
+}
+
+function validarLancamento(c, status, dias, dataPrevista){
+  const erros = [];
+  if(!dias || dias <= 0) erros.push('Informe uma quantidade de dias válida.');
+  if(!dataPrevista) erros.push('Informe a data prevista de início das férias.');
+  if(dias > status.saldoVencido) erros.push(`Saldo insuficiente — disponível: ${fmtDias(status.saldoVencido)} dias.`);
+  const parcelasAtuais = (c.lancamentos || []).length;
+  if(parcelasAtuais >= regras.maxParcelas) erros.push(`Número máximo de parcelas (${regras.maxParcelas}) já foi atingido para este período.`);
+  if(dias > 0 && dias < regras.diasMinParcela) erros.push(`Cada parcela deve ter no mínimo ${regras.diasMinParcela} dias.`);
+  if(erros.length === 0){
+    const saldoApos = status.saldoVencido - dias;
+    const temParcelaGrande = (c.lancamentos || []).some(l => l.dias >= regras.diasMinParcelaMaior) || dias >= regras.diasMinParcelaMaior;
+    if(saldoApos <= 0 && !temParcelaGrande){
+      erros.push(`Pelo menos uma parcela deste período precisa ter ${regras.diasMinParcelaMaior} dias ou mais — isso fecharia o saldo sem cumprir essa regra.`);
+    }
+  }
+  return erros;
+}
+
+async function confirmarLancamento(){
+  const id = $('lancarId').value;
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  const dias = parseFloat($('lancarDias').value);
+  const dataPrevista = $('lancarDataPrevista').value;
+  const status = calcularStatus(c);
+
+  const erros = validarLancamento(c, status, dias, dataPrevista);
+  if(erros.length){
+    $('lancarErro').innerHTML = erros.map(e => `• ${e}`).join('<br>');
+    $('lancarErro').classList.add('show');
+    return;
+  }
+
+  c.lancamentos = c.lancamentos || [];
+  const statusEscolhido = $('lancarStatusEscolhido').value || null;
+  c.lancamentos.push({ id: gerarId('l'), dias, data: new Date().toISOString().slice(0,10), dataPrevista, status: statusEscolhido });
+
+  // Se essa parcela já entra aprovada, tenta fechar quantos períodos completos
+  // os dias já lançados (somados) cobrirem — nunca tudo ou nada, só o que
+  // realmente foi coberto.
+  let msgExtra = '';
+  if(statusEscolhido === 'aprovada'){
+    const fechados = fecharCiclosCompletos(c);
+    if(fechados > 0) msgExtra = ` e ${fechados} período(s) encerrado(s) automaticamente (aprovado)`;
+  }
+
+  await saveColaborador(c);
+  $('modalLancar').classList.remove('open');
+  render();
+  toast(`${fmtDias(dias)} dia(s) programado(s) para ${fmtData(parseISO(dataPrevista))}${msgExtra}`);
+}
+
+// ---------- Editar parcela ----------
+function abrirEditarParcela(colabId, parcelaId){
+  const c = colaboradores.find(x => x.id === colabId);
+  if(!c) return;
+  const l = (c.lancamentos || []).find(p => p.id === parcelaId);
+  if(!l) return;
+  $('editParcelaNome').textContent = c.nome;
+  $('editParcelaColabId').value = colabId;
+  $('editParcelaId').value = parcelaId;
+  $('editParcelaDias').value = l.dias;
+  $('editParcelaData').value = l.dataPrevista;
+  $('editParcelaStatusEscolhido').value = l.status || '';
+  $('editParcelaErro').classList.remove('show');
+  atualizarBotoesAprovacaoEdicao();
+  $('modalEditarParcela').classList.add('open');
+}
+
+function atualizarBotoesAprovacaoEdicao(){
+  const escolhido = $('editParcelaStatusEscolhido').value;
+  $('editParcelaAprovacaoBtns').querySelectorAll('.aprov-btn').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.valor === escolhido);
+    btn.classList.toggle(btn.dataset.valor, btn.dataset.valor === escolhido);
+  });
+}
+
+async function salvarEdicaoParcela(){
+  const colabId = $('editParcelaColabId').value;
+  const parcelaId = $('editParcelaId').value;
+  const c = colaboradores.find(x => x.id === colabId);
+  if(!c) return;
+  const l = (c.lancamentos || []).find(p => p.id === parcelaId);
+  if(!l) return;
+
+  const dias = parseFloat($('editParcelaDias').value);
+  const dataPrevista = $('editParcelaData').value;
+  const statusEscolhido = $('editParcelaStatusEscolhido').value || null;
+
+  if(!dias || dias <= 0){ $('editParcelaErro').textContent = 'Informe uma quantidade de dias válida.'; $('editParcelaErro').classList.add('show'); return; }
+  if(!dataPrevista){ $('editParcelaErro').textContent = 'Informe a data prevista.'; $('editParcelaErro').classList.add('show'); return; }
+
+  l.dias = dias;
+  l.dataPrevista = dataPrevista;
+  l.status = statusEscolhido;
+
+  let msgExtra = '';
+  if(statusEscolhido === 'aprovada'){
+    const fechados = fecharCiclosCompletos(c);
+    if(fechados > 0) msgExtra = ` — ${fechados} período(s) encerrado(s) automaticamente`;
+  }
+
+  await saveColaborador(c);
+  $('modalEditarParcela').classList.remove('open');
+  render();
+  toast(`Parcela atualizada${msgExtra}`);
+}
+
+async function excluirParcela(){
+  const colabId = $('editParcelaColabId').value;
+  const parcelaId = $('editParcelaId').value;
+  const c = colaboradores.find(x => x.id === colabId);
+  if(!c) return;
+  const ok = await askConfirm('Excluir essa parcela? Os dias voltam a ficar disponíveis no saldo.', 'Excluir parcela');
+  if(!ok) return;
+  c.lancamentos = (c.lancamentos || []).filter(p => p.id !== parcelaId);
+  await saveColaborador(c);
+  $('modalEditarParcela').classList.remove('open');
+  render();
+  toast('Parcela excluída');
+}
+
+// ---------- Regras ----------
+function abrirRegras(){
+  $('rDiasPorMes').value = regras.diasPorMes;
+  $('rDiasMinParcela').value = regras.diasMinParcela;
+  $('rDiasMinParcelaMaior').value = regras.diasMinParcelaMaior;
+  $('rMaxParcelas').value = regras.maxParcelas;
+  $('rAlertaSegundo').value = regras.alertaSegundoPeriodoDias;
+  $('rMesesAteLimite').value = regras.mesesAteLimite;
+  $('modalRegras').classList.add('open');
+}
+async function salvarRegras(){
+  regras = {
+    diasPorMes: parseFloat($('rDiasPorMes').value) || REGRAS_PADRAO.diasPorMes,
+    diasMinParcela: parseInt($('rDiasMinParcela').value, 10) || REGRAS_PADRAO.diasMinParcela,
+    diasMinParcelaMaior: parseInt($('rDiasMinParcelaMaior').value, 10) || REGRAS_PADRAO.diasMinParcelaMaior,
+    maxParcelas: parseInt($('rMaxParcelas').value, 10) || REGRAS_PADRAO.maxParcelas,
+    alertaSegundoPeriodoDias: parseInt($('rAlertaSegundo').value, 10) || REGRAS_PADRAO.alertaSegundoPeriodoDias,
+    mesesAteLimite: parseInt($('rMesesAteLimite').value, 10) || REGRAS_PADRAO.mesesAteLimite
+  };
+  await saveRegras();
+  $('modalRegras').classList.remove('open');
+  render();
+  toast('Regras atualizadas');
+}
+
+async function apagarTudo(){
+  const ok1 = await askConfirm(
+    `Isso vai apagar TODOS os ${colaboradores.length} colaborador(es) cadastrados, incluindo saldos, lançamentos e histórico. Essa ação não pode ser desfeita.`,
+    'Apagar tudo'
+  );
+  if(!ok1) return;
+  const ok2 = await askConfirm('Tem certeza mesmo? Confirme novamente para apagar tudo.', 'Confirmar exclusão total');
+  if(!ok2) return;
+  colaboradores = [];
+  await apagarTodosRemoto();
+  $('modalRegras').classList.remove('open');
+  render();
+  toast('Todos os colaboradores foram apagados');
+}
+
+// ---------- Limpeza de histórico (mantém os N encerramentos mais recentes) ----------
+async function limparHistorico(){
+  const n = parseInt($('rManterHistorico').value, 10);
+  if(isNaN(n) || n < 0){ toast('Informe um número válido (0 ou mais)'); return; }
+
+  const afetados = colaboradores.filter(c => (c.historico || []).length > n);
+  if(afetados.length === 0){ toast('Nenhum colaborador tem histórico além desse limite.'); return; }
+
+  const totalRemovido = afetados.reduce((s, c) => s + (c.historico.length - n), 0);
+  const ok = await askConfirm(
+    `Isso vai remover ${totalRemovido} registro(s) de histórico antigo de ${afetados.length} colaborador(es), mantendo só os ${n} mais recentes de cada um. O período em aberto atual não é afetado. Confirmar?`,
+    'Limpar histórico'
+  );
+  if(!ok) return;
+
+  afetados.forEach(c => { c.historico = c.historico.slice(-n); });
+  await salvarVariosColaboradores(afetados);
+  $('modalRegras').classList.remove('open');
+  render();
+  toast(`Histórico reduzido em ${afetados.length} colaborador(es)`);
+}
+
+// ---------- Exportar histórico de férias (.xlsx) ----------
+function exportarHistorico(){
+  if(colaboradores.length === 0){ toast('Nenhum colaborador cadastrado para exportar.'); return; }
+  const hoje = new Date();
+
+  // Aba 1: situação atual (uma linha por colaborador)
+  const resumo = colaboradores.map(c => {
+    const st = calcularStatus(c);
+    const situacao = st.emAquisicao ? 'Em aquisição' : (st.cor === 'red' ? 'Vencido' : (st.cor === 'yellow' ? 'Atenção' : 'Em dia'));
+    const parcelasAtuais = (c.lancamentos || [])
+      .map(l => {
+        const statusTxt = l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'sem status');
+        return `${fmtDias(l.dias)}d (${l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : 's/ data'}, ${statusTxt})`;
+      })
+      .join('; ');
+    return {
+      'Nome': c.nome,
+      'Data-base': fmtData(parseISO(c.baseData)),
+      'Situação': situacao,
+      'Períodos vencidos em aberto': st.ciclosAbertos,
+      'Saldo vencido (dias)': st.emAquisicao ? '' : fmtDias(st.saldoVencido),
+      'Direito acumulado / próx. período (dias)': st.emAquisicao ? fmtDias(st.diasAcumulados) : fmtDias(st.saldoProximo),
+      'Vencimento do período mais antigo': fmtData(st.vencPeriodo),
+      'Limite (prazo legal)': fmtData(st.limite),
+      'Parcelas em aberto (dias, data, status)': parcelasAtuais,
+      'Observação': c.obs || ''
+    };
+  });
+
+  // Aba 2: histórico detalhado (uma linha por período já encerrado)
+  const detalhado = [];
+  colaboradores.forEach(c => {
+    (c.historico || []).forEach(h => {
+      const parcelasTxt = (h.lancamentos || [])
+        .map(l => `${fmtDias(l.dias)}d (${l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : 's/ data'})`)
+        .join('; ');
+      detalhado.push({
+        'Nome': c.nome,
+        'Data de encerramento': fmtData(parseISO(h.dataConclusao)),
+        'Ciclos fechados': h.ciclosFechados || 1,
+        'Dias de direito': fmtDias(h.diasDireito),
+        'Dias usados': fmtDias(h.diasGozados),
+        'Parcelas': parcelasTxt || '(nenhuma — encerrado sem uso)'
+      });
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  const wsResumo = XLSX.utils.json_to_sheet(resumo);
+  wsResumo['!cols'] = [{wch:28},{wch:12},{wch:12},{wch:10},{wch:10},{wch:14},{wch:14},{wch:14},{wch:45},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Situação Atual');
+
+  let wsDetalhado;
+  if(detalhado.length){
+    wsDetalhado = XLSX.utils.json_to_sheet(detalhado);
+    wsDetalhado['!cols'] = [{wch:28},{wch:16},{wch:12},{wch:12},{wch:12},{wch:40}];
+  } else {
+    wsDetalhado = XLSX.utils.aoa_to_sheet([
+      ['Nenhum período foi encerrado ainda.'],
+      ['Esta aba se preenche quando você usa "Encerrar manualmente" ou "Encerrar até aqui" em um colaborador — o "Lançar férias" sozinho apenas programa, não fecha o período.']
+    ]);
+    wsDetalhado['!cols'] = [{wch:90}];
+  }
+  XLSX.utils.book_append_sheet(wb, wsDetalhado, 'Histórico Detalhado');
+
+  const nomeArquivo = `ferias-export-${hoje.toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, nomeArquivo);
+  toast('Exportação gerada — confira os downloads do navegador');
+}
+
+// ---------- Exportar relatório em PDF (via impressão do navegador) ----------
+function exportarPDF(){
+  if(colaboradores.length === 0){ toast('Nenhum colaborador cadastrado para exportar.'); return; }
+  const hoje = new Date();
+  const m = calcularMetricasPizza();
+  const alertas = calcularAlertas();
+
+  const linhasTabela = colaboradores.map(c => {
+    const st = calcularStatus(c);
+    const situacao = st.emAquisicao ? 'Em aquisição' : (st.cor === 'red' ? 'Vencido' : (st.cor === 'yellow' ? 'Atenção' : 'Em dia'));
+    const corBadge = st.emAquisicao ? '#8a95a5' : (st.cor === 'red' ? '#ff5252' : (st.cor === 'yellow' ? '#c98f00' : '#1a8a4a'));
+    const statusParcelas = (c.lancamentos || []).length
+      ? (c.lancamentos || []).map(l => {
+          const txt = l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'sem status');
+          return `${fmtDias(l.dias)}d ${fmtData(parseISO(l.dataPrevista))} (${txt})`;
+        }).join('<br>')
+      : '—';
+    return `<tr>
+      <td>${escapeHtml(c.nome)}</td>
+      <td><span style="color:${corBadge}; font-weight:600;">${situacao}</span></td>
+      <td>${st.emAquisicao ? '—' : fmtDias(st.saldoVencido)}</td>
+      <td>${fmtData(st.vencPeriodo)}</td>
+      <td>${fmtData(st.limite)}</td>
+      <td style="font-size:10px;">${statusParcelas}</td>
+    </tr>`;
+  }).join('');
+
+  const linhasAlerta = alertas.length
+    ? alertas.map(a => `<tr><td>${escapeHtml(a.colaborador.nome)}</td><td>${fmtData(a.proxVencimento)}</td><td>${a.dias}d</td></tr>`).join('')
+    : `<tr><td colspan="3" style="text-align:center; color:#888;">Ninguém em alerta no momento.</td></tr>`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório de Férias — ${fmtData(hoje)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; padding: 30px; }
+  h1 { font-size: 20px; margin-bottom:2px; }
+  .subtitulo { color: #666; font-size: 12px; margin-bottom: 20px; }
+  .kpis { display:flex; gap:12px; margin-bottom:24px; }
+  .kpi { flex:1; border:1px solid #ddd; border-radius:8px; padding:10px 12px; text-align:center; }
+  .kpi .n { font-size:20px; font-weight:700; }
+  .kpi .l { font-size:10px; color:#666; text-transform:uppercase; }
+  h2 { font-size:14px; border-bottom:2px solid #ff8a3d; padding-bottom:4px; margin-top:28px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
+  th, td { border:1px solid #ddd; padding:6px 8px; text-align:left; }
+  th { background:#f5f5f5; font-size:10px; text-transform:uppercase; color:#555; }
+  tr:nth-child(even) { background:#fafafa; }
+  .rodape { margin-top:30px; font-size:10px; color:#999; text-align:center; }
+  @media print {
+    body { padding:10px; }
+    h2 { break-after: avoid; }
+    tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <h1>Relatório de Férias — Logística</h1>
+  <div class="subtitulo">Gerado em ${fmtData(hoje)} às ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} · ${colaboradores.length} colaborador(es)</div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="n">${m.emFeriasCount}</div><div class="l">Em férias</div></div>
+    <div class="kpi"><div class="n">${m.totalProgramadas}</div><div class="l">Programadas</div></div>
+    <div class="kpi"><div class="n">${m.aguardandoCount}</div><div class="l">Aguardando RH</div></div>
+    <div class="kpi"><div class="n">${m.aprovadaCount}</div><div class="l">Aprovadas</div></div>
+    <div class="kpi"><div class="n">${m.alertaCount}</div><div class="l">Em alerta</div></div>
+  </div>
+
+  <h2>Situação por colaborador</h2>
+  <table>
+    <thead><tr><th>Nome</th><th>Situação</th><th>Saldo vencido</th><th>Venc. período</th><th>Limite legal</th><th>Parcelas (dias, data, status)</th></tr></thead>
+    <tbody>${linhasTabela}</tbody>
+  </table>
+
+  <h2>Em alerta — 2º período próximo de também vencer</h2>
+  <table>
+    <thead><tr><th>Nome</th><th>Próx. vencimento</th><th>Dias restantes</th></tr></thead>
+    <tbody>${linhasAlerta}</tbody>
+  </table>
+
+  <div class="rodape">Controle de Férias — relatório gerado automaticamente pelo sistema.</div>
+</body>
+</html>`;
+
+  // Impressão via iframe escondido na própria página — evita o bloqueio de
+  // pop-up que window.open() costuma sofrer em navegadores mobile/Safari.
+  let iframe = document.getElementById('iframeExportarPDF');
+  if(iframe) iframe.remove();
+  iframe = document.createElement('iframe');
+  iframe.id = 'iframeExportarPDF';
+  iframe.style.cssText = 'position:fixed; right:0; bottom:0; width:0; height:0; border:0; visibility:hidden;';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  iframe.onload = () => {
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }, 200);
+  };
+}
+
+// ---------- Importar: texto colado ----------
+function parseDataBr(str){
+  const m = String(str).trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if(!m) return null;
+  let [, d, mo, y] = m;
+  y = y.length === 2 ? '20'+y : y;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+async function confirmarImportTexto(){
+  const raw = $('importText').value.trim();
+  if(!raw){ toast('Cole ao menos uma linha'); return; }
+  const linhas = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const novos = [];
+  let ignorados = 0;
+  linhas.forEach((linha, i) => {
+    const partes = linha.split(';').map(p => p.trim());
+    if(partes.length < 2){ ignorados++; return; }
+    const nome = partes[0];
+    const iso = parseDataBr(partes[1]);
+    if(!nome || !iso){ ignorados++; return; }
+    const novo = {
+      id: gerarId('c'),
+      nome, baseData: iso, periodosFechados: 0,
+      lancamentos: [], statusAprovacao: null, obs:'', historico: []
+    };
+    colaboradores.push(novo);
+    novos.push(novo);
+  });
+  await salvarVariosColaboradores(novos); fecharModalImport(); render();
+  toast(`${novos.length} importado(s)${ignorados ? `, ${ignorados} linha(s) ignorada(s)` : ''}`);
+}
+
+// ---------- Importar: Excel ----------
+function parseDataCelulaISO(valor){
+  if(valor instanceof Date && !isNaN(valor)){
+    return `${valor.getFullYear()}-${String(valor.getMonth()+1).padStart(2,'0')}-${String(valor.getDate()).padStart(2,'0')}`;
+  }
+  if(typeof valor === 'number'){
+    const d = XLSX.SSF.parse_date_code(valor);
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  if(typeof valor === 'string') return parseDataBr(valor);
+  return null;
+}
+
+$('excelFile').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!/\.(xlsx|xls)$/i.test(file.name)){
+    toast('Esse arquivo não é uma planilha Excel (.xlsx/.xls) — parece uma foto ou outro tipo de arquivo.');
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const jsonRaw = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+      if(jsonRaw.length < 2){ toast('Planilha vazia'); return; }
+      const headers = jsonRaw[0].map((h,i) => (h && String(h).trim()) || `Coluna ${i+1}`);
+      excelRows = jsonRaw.slice(1).filter(r => r && r.length);
+
+      const colNomeSel = $('colNome');
+      const colDataSel = $('colData');
+      const colDireitoSel = $('colDireito');
+      const colRestoSel = $('colResto');
+      const opts = headers.map((h,i)=>`<option value="${i}">${escapeHtml(h)}</option>`).join('');
+      colNomeSel.innerHTML = opts; colDataSel.innerHTML = opts; colDireitoSel.innerHTML = opts; colRestoSel.innerHTML = opts;
+
+      headers.forEach((h,i)=>{
+        const hl = h.toLowerCase();
+        if(hl.includes('nome')) colNomeSel.value = i;
+        if(hl.includes('vál') || hl.includes('val') && hl.includes('desde')) colDataSel.value = i;
+        else if(hl.includes('data') || hl.includes('admiss') || hl.includes('aquisit')) colDataSel.value = i;
+        if(hl.includes('direito')) colDireitoSel.value = i;
+        if(hl.includes('resto') || hl.includes('saldo')) colRestoSel.value = i;
+      });
+
+      // auto-detecta planilha "com saldo" se achar colunas de Direito e Resto
+      const temColunasSaldo = headers.some(h => h.toLowerCase().includes('direito')) && headers.some(h => h.toLowerCase().includes('resto'));
+      $('chkComSaldo').checked = temColunasSaldo;
+      $('rowSaldoCols').style.display = temColunasSaldo ? 'flex' : 'none';
+
+      $('excelMapping').style.display = 'block';
+      renderExcelPreview(headers);
+    }catch(err){
+      toast('Não consegui ler esse arquivo como Excel. Confirme se é o arquivo .xlsx/.xls exportado do sistema, não uma foto ou print.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+$('chkComSaldo').addEventListener('change', (e) => {
+  $('rowSaldoCols').style.display = e.target.checked ? 'flex' : 'none';
+});
+
+function renderExcelPreview(headers){
+  const wrap = $('excelPreviewWrap');
+  const linhas = excelRows.slice(0, 5);
+  wrap.innerHTML = `
+    <table class="preview-table">
+      <thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+      <tbody>${linhas.map(r => `<tr>${headers.map((_,i)=>`<td>${r[i] !== undefined && r[i] !== null ? escapeHtml(String(r[i])) : ''}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>
+    <div class="helptext">Mostrando ${linhas.length} de ${excelRows.length} linha(s).</div>
+  `;
+}
+
+async function confirmarImportExcel(){
+  if(!excelRows){ toast('Selecione um arquivo primeiro'); return; }
+  const comSaldo = $('chkComSaldo').checked;
+  const idxNome = parseInt($('colNome').value, 10);
+  const idxData = parseInt($('colData').value, 10);
+
+  if(!comSaldo){
+    const novos = [];
+    let ignorados = 0;
+    excelRows.forEach((row, i) => {
+      const nome = row[idxNome] ? String(row[idxNome]).trim() : '';
+      const iso = parseDataCelulaISO(row[idxData]);
+      if(!nome || !iso){ ignorados++; return; }
+      const novo = {
+        id: gerarId('c'),
+        nome, baseData: iso, periodosFechados: 0,
+        lancamentos: [], statusAprovacao: null, obs:'', historico: []
+      };
+      colaboradores.push(novo);
+      novos.push(novo);
+    });
+    await salvarVariosColaboradores(novos); fecharModalImport(); render();
+    toast(`${novos.length} importado(s)${ignorados ? `, ${ignorados} linha(s) ignorada(s)` : ''}`);
+    return;
+  }
+
+  // ---- Importação "com saldo": agrupa por nome, reconstrói base + uso já feito ----
+  const idxDireito = parseInt($('colDireito').value, 10);
+  const idxResto = parseInt($('colResto').value, 10);
+
+  const grupos = {};
+  let ignorados = 0;
+  excelRows.forEach(row => {
+    const nome = row[idxNome] ? String(row[idxNome]).trim() : '';
+    const iso = parseDataCelulaISO(row[idxData]);
+    const direito = parseFloat(String(row[idxDireito]).replace(',', '.'));
+    const resto = parseFloat(String(row[idxResto]).replace(',', '.'));
+    if(!nome || !iso || isNaN(direito) || isNaN(resto)){ ignorados++; return; }
+    const chave = nome.toLowerCase();
+    if(!grupos[chave]) grupos[chave] = { nome, linhas: [] };
+    grupos[chave].linhas.push({ iso, direito, resto });
+  });
+
+  const novos = [];
+  let i = 0;
+  Object.values(grupos).forEach(grupo => {
+    grupo.linhas.sort((a,b) => a.iso.localeCompare(b.iso));
+
+    let periodosFechados = 0;
+    let idx = 0;
+    // pula ciclos já totalmente consumidos (resto <= 0) no início da lista
+    while(idx < grupo.linhas.length - 1 && grupo.linhas[idx].resto <= 0){
+      periodosFechados++;
+      idx++;
+    }
+    const linhaBase = grupo.linhas[idx];
+    const baseData = linhaBase.iso;
+    const usado = Math.max(0, linhaBase.direito - linhaBase.resto);
+    const lancamentos = usado > 0
+      ? [{ id: gerarId('l'), dias: usado, data: baseData, dataPrevista: baseData, status: null }]
+      : [];
+
+    const novo = {
+      id: gerarId('c'),
+      nome: grupo.nome, baseData, periodosFechados,
+      lancamentos, statusAprovacao: null,
+      obs: 'Importado de planilha com saldo (dados de referência de jan/2025)',
+      historico: []
+    };
+    colaboradores.push(novo);
+    novos.push(novo);
+    i++;
+  });
+
+  await salvarVariosColaboradores(novos); fecharModalImport(); render();
+  toast(`${novos.length} colaborador(es) importado(s) com saldo reconstruído${ignorados ? `, ${ignorados} linha(s) ignorada(s)` : ''}`);
+}
+
+function fecharModalImport(){
+  $('modalImport').classList.remove('open');
+  $('importText').value = '';
+  $('excelFile').value = '';
+  $('excelMapping').style.display = 'none';
+  $('chkComSaldo').checked = false;
+  $('rowSaldoCols').style.display = 'none';
+  excelRows = null;
+}
+
+// ---------- Eventos ----------
+$('btnAdd').onclick = abrirFormNovo;
+$('btnCancelForm').onclick = () => $('modalForm').classList.remove('open');
+$('btnSaveForm').onclick = salvarForm;
+$('btnImport').onclick = () => $('modalImport').classList.add('open');
+$('btnCancelImport').onclick = fecharModalImport;
+$('btnConfirmImport').onclick = () => {
+  const tabAtiva = document.querySelector('.tab-btn.active').dataset.tab;
+  if(tabAtiva === 'excel') confirmarImportExcel(); else confirmarImportTexto();
+};
+$('btnCancelLancar').onclick = () => $('modalLancar').classList.remove('open');
+$('btnConfirmLancar').onclick = confirmarLancamento;
+$('lancarAprovacaoBtns').addEventListener('click', (e) => {
+  const btn = e.target.closest('.aprov-btn');
+  if(!btn) return;
+  const atual = $('lancarStatusEscolhido').value;
+  $('lancarStatusEscolhido').value = (atual === btn.dataset.valor) ? '' : btn.dataset.valor;
+  atualizarBotoesAprovacaoLancar();
+});
+$('btnCancelEditarParcela').onclick = () => $('modalEditarParcela').classList.remove('open');
+$('btnSalvarEditarParcela').onclick = salvarEdicaoParcela;
+$('btnExcluirParcela').onclick = excluirParcela;
+$('editParcelaAprovacaoBtns').addEventListener('click', (e) => {
+  const btn = e.target.closest('.aprov-btn');
+  if(!btn) return;
+  const atual = $('editParcelaStatusEscolhido').value;
+  $('editParcelaStatusEscolhido').value = (atual === btn.dataset.valor) ? '' : btn.dataset.valor;
+  atualizarBotoesAprovacaoEdicao();
+});
+$('btnCancelEncerrar').onclick = () => $('modalEncerrar').classList.remove('open');
+$('btnCancelHistorico').onclick = () => $('modalHistorico').classList.remove('open');
+$('btnDashboard').onclick = abrirDashboard;
+$('btnCancelDashboard').onclick = () => $('modalDashboard').classList.remove('open');
+$('calMesAnterior').onclick = () => {
+  calMesAtual--;
+  if(calMesAtual < 0){ calMesAtual = 11; calAnoAtual--; }
+  renderCalendario();
+};
+$('calMesSeguinte').onclick = () => {
+  calMesAtual++;
+  if(calMesAtual > 11){ calMesAtual = 0; calAnoAtual++; }
+  renderCalendario();
+};
+$('btnCancelDashExpandido').onclick = () => $('modalDashExpandido').classList.remove('open');
+document.querySelectorAll('.dash-mini-chip[data-tab], .pizza-card[data-tab]').forEach(el => {
+  el.addEventListener('click', () => abrirDashExpandido(el.dataset.tab));
+});
+$('btnRegras').onclick = abrirRegras;
+$('btnCancelRegras').onclick = () => $('modalRegras').classList.remove('open');
+$('btnSaveRegras').onclick = salvarRegras;
+$('btnApagarTudo').onclick = apagarTudo;
+$('btnExportar').onclick = exportarHistorico;
+$('btnExportarPDF').onclick = exportarPDF;
+$('btnLimparHistorico').onclick = limparHistorico;
+$('search').oninput = render;
+$('sortSelect').onchange = render;
+$('thresholdSelect').onchange = async (e) => { thresholdAmarelo = parseInt(e.target.value, 10); await saveThreshold(); render(); };
+document.querySelectorAll('.chip').forEach(chip=>{ chip.onclick = () => { filtroAtual = chip.dataset.filter; render(); }; });
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.onclick = () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    $('tab-'+btn.dataset.tab).classList.add('active');
+  };
+});
+
+// Delegação de eventos para os botões gerados dinamicamente nos cards
+// (evita depender de atributos onclick inline, que podem ser bloqueados
+// em alguns ambientes de pré-visualização/iframe).
+document.body.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if(!btn) return;
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+
+  if(action === 'editar') editarColaborador(id);
+  else if(action === 'excluir') excluirColaborador(id);
+  else if(action === 'aprovacao') toggleAprovacao(id, btn.dataset.valor);
+  else if(action === 'encerrar') abrirEncerrar(id);
+  else if(action === 'lancar') abrirLancar(id);
+  else if(action === 'encerrar-ate') confirmarEncerrarAte(id, parseInt(btn.dataset.indice, 10));
+  else if(action === 'historico') abrirHistorico(id);
+  else if(action === 'reabrir-periodo') reabrirUltimoPeriodo(id);
+  else if(action === 'editar-parcela') abrirEditarParcela(id, btn.dataset.parcela);
+  else if(action === 'lancar-de-encerrar'){ $('modalEncerrar').classList.remove('open'); abrirLancar(id); }
+  else if(action === 'dash-aprovar') dashAprovar(id, btn.dataset.parcela);
+  else if(action === 'dash-reprovar') dashReprovar(id, btn.dataset.parcela);
+  else if(action === 'cal-dia') mostrarDetalheDia(btn.dataset.data);
+});
+
+// ---------- Autenticação (UI de login/logout) ----------
+function mostrarApp(){
+  $('loginOverlay').classList.remove('open');
+  $('appRoot').style.display = 'block';
+}
+function mostrarLogin(){
+  $('appRoot').style.display = 'none';
+  $('loginOverlay').classList.add('open');
+}
+
+if(firebaseReady){
+  authInstance.onAuthStateChanged((user) => {
+    currentUser = user;
+    if(user){
+      $('userBar').style.display = 'flex';
+      $('userEmailTxt').textContent = user.email;
+      mostrarApp();
+      loadData();
+    } else {
+      mostrarLogin();
+    }
+  });
+
+  $('btnLogin').addEventListener('click', async () => {
+    const email = $('loginEmail').value.trim();
+    const senha = $('loginSenha').value;
+    $('loginErro').classList.remove('show');
+    if(!email || !senha){ $('loginErro').textContent = 'Preencha e-mail e senha.'; $('loginErro').classList.add('show'); return; }
+    try{
+      await authInstance.signInWithEmailAndPassword(email, senha);
+    }catch(e){
+      $('loginErro').textContent = 'E-mail ou senha inválidos.';
+      $('loginErro').classList.add('show');
+    }
+  });
+  $('loginSenha').addEventListener('keydown', (e) => { if(e.key === 'Enter') $('btnLogin').click(); });
+
+  $('btnLogout').addEventListener('click', () => authInstance.signOut());
+} else {
+  // Sem Firebase disponível (ex.: dentro do Claude) — segue sem exigir login.
+  mostrarApp();
+  loadData();
+}
+</script>
+
+</div><!-- fim #appRoot -->
+
+</body>
+</html>
