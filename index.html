@@ -2604,6 +2604,17 @@ function mostrarCarregando(){
   $('appRoot').style.display = 'none';
   $('loginOverlay').classList.add('open');
 }
+function mostrarErroConexao(mensagem){
+  $('appRoot').style.display = 'none';
+  $('loginOverlay').innerHTML = `
+    <div class="modal" style="max-width:340px; text-align:center;">
+      <h2 style="margin-bottom:6px; color:var(--vermelho);">⚠️ Não foi possível conectar</h2>
+      <p class="helptext" style="margin-bottom:14px;">${mensagem}</p>
+      <p class="helptext">Seus dados continuam salvos com segurança — isso é só uma falha de conexão neste acesso. Assim que o problema for resolvido, recarregue a página.</p>
+    </div>
+  `;
+  $('loginOverlay').classList.add('open');
+}
 
 if(firebaseReady){
   authInstance.onAuthStateChanged((user) => {
@@ -2615,11 +2626,15 @@ if(firebaseReady){
     } else {
       // Sem sessão ainda: entra sozinho, sem pedir nada — o usuário só abre e usa.
       mostrarCarregando();
-      authInstance.signInAnonymously().catch(() => {
-        // Se por algum motivo o login anônimo falhar (ex.: não habilitado no
-        // console do Firebase), segue mesmo assim usando o armazenamento local.
-        mostrarApp();
-        loadData();
+      authInstance.signInAnonymously().catch((erro) => {
+        // Nunca segue silenciosamente com dados locais/vazios fingindo que está
+        // tudo certo — isso já causou confusão de "perdi meus dados" quando na
+        // verdade era só o Firebase recusando o domínio ou o login anônimo.
+        const dominioNaoAutorizado = erro && erro.code === 'auth/unauthorized-domain';
+        const msg = dominioNaoAutorizado
+          ? `O domínio <b>${location.hostname}</b> ainda não está autorizado no Firebase. No console: Authentication → Settings → Authorized domains → adicione esse domínio.`
+          : `Erro ao conectar: ${erro && erro.message ? erro.message : 'motivo desconhecido'}. Confira se o login anônimo está ativado em Authentication → Sign-in method.`;
+        mostrarErroConexao(msg);
       });
     }
   });
