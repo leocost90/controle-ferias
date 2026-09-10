@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Férias</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -99,6 +101,16 @@
   .cal-dia.nivel-baixo .cal-badge{background:rgba(46,204,113,.18); color:var(--verde);}
   .cal-dia.nivel-medio .cal-badge{background:rgba(244,196,48,.18); color:var(--amarelo);}
   .cal-dia.nivel-alto .cal-badge{background:rgba(255,82,82,.18); color:var(--vermelho);}
+
+  .turno-resumo{display:flex; flex-direction:column; gap:8px;}
+  .turno-card{
+    background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:8px; padding:10px 12px;
+  }
+  .turno-card-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .turno-card-nome{font-weight:700; font-size:.82rem;}
+  .turno-card-n{font-family:var(--mono); font-weight:700; color:var(--accent); font-size:.9rem;}
+  .turno-card-nomes{font-size:.68rem; color:var(--ink-dim);}
 
   .summary{display:flex; gap:8px; padding:12px 16px 4px; overflow-x:auto;}
   .chip{flex:1; min-width:78px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 10px; text-align:center; cursor:pointer; transition:.15s;}
@@ -291,19 +303,9 @@
 
 <!-- Tela de login (só aparece quando publicado fora do Claude, com Firebase disponível) -->
 <div class="modal-overlay open" id="loginOverlay">
-  <div class="modal" style="max-width:360px;">
-    <h2 style="margin-bottom:4px;">Controle de Férias</h2>
-    <p class="helptext" style="margin-bottom:18px;">Entre com o e-mail e senha cadastrados no Firebase deste projeto.</p>
-    <div class="error-box" id="loginErro"></div>
-    <div class="field">
-      <label>E-mail</label>
-      <input type="email" id="loginEmail" autocomplete="username">
-    </div>
-    <div class="field">
-      <label>Senha</label>
-      <input type="password" id="loginSenha" autocomplete="current-password">
-    </div>
-    <button class="btn btn-primary" id="btnLogin" style="width:100%;">Entrar</button>
+  <div class="modal" style="max-width:300px; text-align:center;">
+    <h2 style="margin-bottom:6px;">Controle de Férias</h2>
+    <p class="helptext">Carregando...</p>
   </div>
 </div>
 
@@ -380,8 +382,12 @@
       </div>
     </div>
     <div class="field">
+      <label>Turno (opcional)</label>
+      <input type="text" id="fTurno" placeholder="Ex: Manhã, Tarde, Noite">
+    </div>
+    <div class="field">
       <label>Observação (opcional)</label>
-      <input type="text" id="fObs" placeholder="Ex: setor, turno...">
+      <input type="text" id="fObs" placeholder="Ex: setor...">
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btnCancelForm">Cancelar</button>
@@ -429,6 +435,15 @@
             <label>Coluna "Total resto"</label>
             <select id="colResto"></select>
           </div>
+        </div>
+        <div class="field">
+          <label>Coluna do turno (opcional)</label>
+          <select id="colTurno">
+            <option value="">Não tenho essa coluna</option>
+          </select>
+        </div>
+        <div class="helptext" style="margin-bottom:8px;">
+          Se algum nome dessa planilha já existir no app, ele <b>não será duplicado</b> — só o turno é atualizado, e todo o saldo/histórico/parcelas que já estavam lançados continuam intactos.
         </div>
         <div class="helptext">
           Se marcar a opção acima: o app agrupa as linhas por nome, usa a data mais antiga como base e reconstrói automaticamente os dias já usados (Direito - Total resto) como uma parcela histórica — assim o saldo já entra correto.
@@ -617,6 +632,9 @@
         </div>
       </div>
     </div>
+
+    <h3 class="dash-secao" style="margin-top:24px;">👥 Em férias agora, por turno</h3>
+    <div id="turnoResumo" class="turno-resumo"></div>
 
     <h3 class="dash-secao" style="margin-top:24px;">📅 Calendário de cobertura</h3>
     <div class="cal-header">
@@ -1175,6 +1193,7 @@ function render(){
           ${alertaProximoVenc ? `<div class="alerta-proximo">⏳ Faltam ${st.diasParaProximoVencimento}d para o período seguinte também vencer (ficaria com ${st.ciclosAbertos + 1} períodos empilhados)</div>` : ''}
           <div class="meta">
             <span>Data-base: <b>${fmtData(parseISO(c.baseData))}</b></span>
+            ${c.turno ? `<span>Turno: <b>${escapeHtml(c.turno)}</b></span>` : ''}
             <span>Venc. período mais antigo: <b>${fmtData(st.vencPeriodo)}</b></span>
             <span>Limite (prazo legal): <b>${fmtData(st.limite)}</b></span>
             ${!st.emAquisicao ? `<span>Próximo período vence em: <b>${fmtData(addMonths(st.inicioAcumulo, 12))}</b></span>` : ''}
@@ -1211,14 +1230,14 @@ function escapeHtml(s){
 // ---------- CRUD colaborador ----------
 function abrirFormNovo(){
   $('formTitle').textContent = 'Novo colaborador';
-  $('editId').value = ''; $('fNome').value = ''; $('fData').value = ''; $('fObs').value = '';
+  $('editId').value = ''; $('fNome').value = ''; $('fData').value = ''; $('fTurno').value = ''; $('fObs').value = '';
   $('modalForm').classList.add('open');
 }
 function editarColaborador(id){
   const c = colaboradores.find(x => x.id === id);
   if(!c) return;
   $('formTitle').textContent = 'Editar colaborador';
-  $('editId').value = c.id; $('fNome').value = c.nome; $('fData').value = c.baseData; $('fObs').value = c.obs || '';
+  $('editId').value = c.id; $('fNome').value = c.nome; $('fData').value = c.baseData; $('fTurno').value = c.turno || ''; $('fObs').value = c.obs || '';
   $('modalForm').classList.add('open');
 }
 async function excluirColaborador(id){
@@ -1231,6 +1250,7 @@ async function excluirColaborador(id){
 async function salvarForm(){
   const nome = $('fNome').value.trim();
   const dataStr = $('fData').value;
+  const turno = $('fTurno').value.trim();
   const obs = $('fObs').value.trim();
   const editId = $('editId').value;
   if(!nome){ toast('Informe o nome'); return; }
@@ -1238,11 +1258,11 @@ async function salvarForm(){
   let alvo;
   if(editId){
     alvo = colaboradores.find(x => x.id === editId);
-    alvo.nome = nome; alvo.baseData = dataStr; alvo.obs = obs;
+    alvo.nome = nome; alvo.baseData = dataStr; alvo.turno = turno; alvo.obs = obs;
   } else {
     alvo = {
       id: gerarId('c'),
-      nome, baseData: dataStr, periodosFechados: 0,
+      nome, baseData: dataStr, periodosFechados: 0, turno,
       lancamentos: [], statusAprovacao: null, obs, historico: []
     };
     colaboradores.push(alvo);
@@ -1633,6 +1653,31 @@ function mostrarDetalheDia(dataISO){
   `;
 }
 
+function renderResumoTurno(){
+  const { emFerias } = calcularListasDashboard();
+  const porTurno = {};
+  emFerias.forEach(p => {
+    const turno = p.colaborador.turno && p.colaborador.turno.trim() ? p.colaborador.turno.trim() : 'Sem turno definido';
+    if(!porTurno[turno]) porTurno[turno] = [];
+    porTurno[turno].push(p.colaborador.nome);
+  });
+
+  const turnos = Object.keys(porTurno).sort();
+  if(turnos.length === 0){
+    $('turnoResumo').innerHTML = '<div class="dash-empty">Ninguém em férias no momento.</div>';
+    return;
+  }
+  $('turnoResumo').innerHTML = turnos.map(turno => `
+    <div class="turno-card">
+      <div class="turno-card-top">
+        <span class="turno-card-nome">${escapeHtml(turno)}</span>
+        <span class="turno-card-n">${porTurno[turno].length}</span>
+      </div>
+      <div class="turno-card-nomes">${porTurno[turno].map(escapeHtml).join(', ')}</div>
+    </div>
+  `).join('');
+}
+
 function abrirDashboard(){
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   $('dashData').textContent = fmtData(hoje);
@@ -1671,6 +1716,8 @@ function abrirDashboard(){
   $('pizzaPctAlerta').textContent = `${Math.round(m.pctAlerta)}%`;
   $('pizzaSubAlerta').textContent = `${m.alertaCount} de ${m.total} pessoas`;
   $('pizzaNomesAlerta').innerHTML = chipsNomes(calcularAlertas().map(a => a.colaborador.nome), 'Ninguém em alerta no momento.');
+
+  renderResumoTurno();
 
   calAnoAtual = hoje.getFullYear();
   calMesAtual = hoje.getMonth();
@@ -1996,7 +2043,37 @@ async function limparHistorico(){
 }
 
 // ---------- Exportar histórico de férias (.xlsx) ----------
-function exportarHistorico(){
+// Tenta abrir a caixa "Salvar como" de verdade (Chrome/Edge/Android); se o
+// navegador não suportar (Safari/iOS, Firefox), cai no download padrão pra
+// pasta de Downloads, que é o único jeito possível nesses casos.
+// Tenta abrir a caixa "Salvar como" nativa do sistema (Chrome/Edge no
+// computador e em boa parte dos Android). Onde essa API não existe (Safari,
+// iPhone, Firefox), cai automaticamente pro download direto de sempre.
+async function salvarArquivo(blob, nomeArquivo, tipo){
+  if(window.showSaveFilePicker){
+    try{
+      const handle = await window.showSaveFilePicker({
+        suggestedName: nomeArquivo,
+        types: [{ description: tipo.desc, accept: tipo.accept }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    }catch(e){
+      if(e.name === 'AbortError') return false; // usuário cancelou o "salvar como"
+      // qualquer outro erro: cai pro fallback abaixo
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nomeArquivo;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
+async function exportarHistorico(){
   if(colaboradores.length === 0){ toast('Nenhum colaborador cadastrado para exportar.'); return; }
   const hoje = new Date();
 
@@ -2061,118 +2138,126 @@ function exportarHistorico(){
   XLSX.utils.book_append_sheet(wb, wsDetalhado, 'Histórico Detalhado');
 
   const nomeArquivo = `ferias-export-${hoje.toISOString().slice(0,10)}.xlsx`;
-  XLSX.writeFile(wb, nomeArquivo);
-  toast('Exportação gerada — confira os downloads do navegador');
+  const arrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const salvou = await salvarArquivo(blob, nomeArquivo, {
+    desc: 'Planilha Excel',
+    accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
+  });
+  if(salvou) toast('Excel gerado');
 }
 
 // ---------- Exportar relatório em PDF (via impressão do navegador) ----------
-function exportarPDF(){
+async function exportarPDF(){
   if(colaboradores.length === 0){ toast('Nenhum colaborador cadastrado para exportar.'); return; }
+  if(typeof window.jspdf === 'undefined'){ toast('Não consegui carregar o gerador de PDF — confira sua conexão e tente de novo.'); return; }
+  const { jsPDF } = window.jspdf;
   const hoje = new Date();
   const m = calcularMetricasPizza();
   const alertas = calcularAlertas();
+  const hojeRef = new Date(); hojeRef.setHours(0,0,0,0);
 
-  const linhasTabela = colaboradores.map(c => {
+  // Monta uma linha por PARCELA (não por colaborador), separando claramente
+  // o que já foi gozado do que ainda está planejado/em aberto.
+  const linhasParcelas = [];
+  colaboradores.forEach(c => {
     const st = calcularStatus(c);
     const situacao = st.emAquisicao ? 'Em aquisição' : (st.cor === 'red' ? 'Vencido' : (st.cor === 'yellow' ? 'Atenção' : 'Em dia'));
-    const corBadge = st.emAquisicao ? '#8a95a5' : (st.cor === 'red' ? '#ff5252' : (st.cor === 'yellow' ? '#c98f00' : '#1a8a4a'));
-    const statusParcelas = (c.lancamentos || []).length
-      ? (c.lancamentos || []).map(l => {
-          const txt = l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'sem status');
-          return `${fmtDias(l.dias)}d ${fmtData(parseISO(l.dataPrevista))} (${txt})`;
-        }).join('<br>')
-      : '—';
-    return `<tr>
-      <td>${escapeHtml(c.nome)}</td>
-      <td><span style="color:${corBadge}; font-weight:600;">${situacao}</span></td>
-      <td>${st.emAquisicao ? '—' : fmtDias(st.saldoVencido)}</td>
-      <td>${fmtData(st.vencPeriodo)}</td>
-      <td>${fmtData(st.limite)}</td>
-      <td style="font-size:10px;">${statusParcelas}</td>
-    </tr>`;
-  }).join('');
 
-  const linhasAlerta = alertas.length
-    ? alertas.map(a => `<tr><td>${escapeHtml(a.colaborador.nome)}</td><td>${fmtData(a.proxVencimento)}</td><td>${a.dias}d</td></tr>`).join('')
-    : `<tr><td colspan="3" style="text-align:center; color:#888;">Ninguém em alerta no momento.</td></tr>`;
+    // Parcelas já gozadas (vindas de períodos encerrados no histórico)
+    (c.historico || []).forEach(h => {
+      (h.lancamentos || []).forEach(l => {
+        linhasParcelas.push([
+          c.nome, 'Já gozado', `${fmtDias(l.dias)}d`, fmtData(parseISO(l.dataPrevista)),
+          l.status === 'aprovada' ? 'Aprovada' : (l.status === 'aguardando' ? 'Aguardando RH' : '—'),
+          situacao, c.turno || '—'
+        ]);
+      });
+    });
 
-  const html = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Relatório de Férias — ${fmtData(hoje)}</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; padding: 30px; }
-  h1 { font-size: 20px; margin-bottom:2px; }
-  .subtitulo { color: #666; font-size: 12px; margin-bottom: 20px; }
-  .kpis { display:flex; gap:12px; margin-bottom:24px; }
-  .kpi { flex:1; border:1px solid #ddd; border-radius:8px; padding:10px 12px; text-align:center; }
-  .kpi .n { font-size:20px; font-weight:700; }
-  .kpi .l { font-size:10px; color:#666; text-transform:uppercase; }
-  h2 { font-size:14px; border-bottom:2px solid #ff8a3d; padding-bottom:4px; margin-top:28px; }
-  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
-  th, td { border:1px solid #ddd; padding:6px 8px; text-align:left; }
-  th { background:#f5f5f5; font-size:10px; text-transform:uppercase; color:#555; }
-  tr:nth-child(even) { background:#fafafa; }
-  .rodape { margin-top:30px; font-size:10px; color:#999; text-align:center; }
-  @media print {
-    body { padding:10px; }
-    h2 { break-after: avoid; }
-    tr { break-inside: avoid; }
-  }
-</style>
-</head>
-<body>
-  <h1>Relatório de Férias — Logística</h1>
-  <div class="subtitulo">Gerado em ${fmtData(hoje)} às ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} · ${colaboradores.length} colaborador(es)</div>
+    // Parcelas em aberto: separa se já está em curso, planejada (futura) ou já
+    // passou a data mas ainda não foi formalmente encerrada.
+    (c.lancamentos || []).forEach(l => {
+      const inicio = parseISO(l.dataPrevista);
+      const retorno = addDays(inicio, l.dias);
+      const tipo = retorno <= hojeRef ? 'Já gozado (aguard. encerramento)' : (inicio <= hojeRef ? 'Em curso' : 'Planejado');
+      linhasParcelas.push([
+        c.nome, tipo, `${fmtDias(l.dias)}d`, fmtData(inicio),
+        l.status === 'aprovada' ? 'Aprovada' : (l.status === 'aguardando' ? 'Aguardando RH' : 'Sem status'),
+        situacao, c.turno || '—'
+      ]);
+    });
 
-  <div class="kpis">
-    <div class="kpi"><div class="n">${m.emFeriasCount}</div><div class="l">Em férias</div></div>
-    <div class="kpi"><div class="n">${m.totalProgramadas}</div><div class="l">Programadas</div></div>
-    <div class="kpi"><div class="n">${m.aguardandoCount}</div><div class="l">Aguardando RH</div></div>
-    <div class="kpi"><div class="n">${m.aprovadaCount}</div><div class="l">Aprovadas</div></div>
-    <div class="kpi"><div class="n">${m.alertaCount}</div><div class="l">Em alerta</div></div>
-  </div>
+    // Colaborador sem nenhuma parcela lançada (nem histórico, nem em aberto)
+    if((c.historico || []).length === 0 && (c.lancamentos || []).length === 0){
+      linhasParcelas.push([c.nome, '—', '—', '—', '—', situacao, c.turno || '—']);
+    }
+  });
 
-  <h2>Situação por colaborador</h2>
-  <table>
-    <thead><tr><th>Nome</th><th>Situação</th><th>Saldo vencido</th><th>Venc. período</th><th>Limite legal</th><th>Parcelas (dias, data, status)</th></tr></thead>
-    <tbody>${linhasTabela}</tbody>
-  </table>
+  const linhasAlerta = alertas.map(a => [escapeHtmlPdf(a.colaborador.nome), fmtData(a.proxVencimento), `${a.dias}d`]);
 
-  <h2>Em alerta — 2º período próximo de também vencer</h2>
-  <table>
-    <thead><tr><th>Nome</th><th>Próx. vencimento</th><th>Dias restantes</th></tr></thead>
-    <tbody>${linhasAlerta}</tbody>
-  </table>
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const largura = doc.internal.pageSize.getWidth();
 
-  <div class="rodape">Controle de Férias — relatório gerado automaticamente pelo sistema.</div>
-</body>
-</html>`;
+  doc.setFontSize(16); doc.setFont(undefined, 'bold');
+  doc.text('Relatório de Férias — Logística', 30, 32);
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+  doc.text(`Gerado em ${fmtData(hoje)} às ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} · ${colaboradores.length} colaborador(es)`, 30, 46);
+  doc.setTextColor(0);
 
-  // Impressão via iframe escondido na própria página — evita o bloqueio de
-  // pop-up que window.open() costuma sofrer em navegadores mobile/Safari.
-  let iframe = document.getElementById('iframeExportarPDF');
-  if(iframe) iframe.remove();
-  iframe = document.createElement('iframe');
-  iframe.id = 'iframeExportarPDF';
-  iframe.style.cssText = 'position:fixed; right:0; bottom:0; width:0; height:0; border:0; visibility:hidden;';
-  document.body.appendChild(iframe);
+  const kpis = [
+    ['Em férias', m.emFeriasCount], ['Programadas', m.totalProgramadas],
+    ['Aguardando RH', m.aguardandoCount], ['Aprovadas', m.aprovadaCount], ['Em alerta', m.alertaCount]
+  ];
+  let xKpi = 30;
+  const larguraKpi = (largura - 60) / kpis.length;
+  kpis.forEach(([label, valor]) => {
+    doc.setDrawColor(220); doc.rect(xKpi, 58, larguraKpi - 8, 40);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(String(valor), xKpi + (larguraKpi-8)/2, 78, {align:'center'});
+    doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+    doc.text(label.toUpperCase(), xKpi + (larguraKpi-8)/2, 90, {align:'center'});
+    doc.setTextColor(0);
+    xKpi += larguraKpi;
+  });
 
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
+  doc.autoTable({
+    startY: 112,
+    head: [['Nome', 'Tipo', 'Dias', 'Data início', 'Aprovação', 'Situação do período', 'Turno']],
+    body: linhasParcelas,
+    styles: { fontSize: 8, cellPadding: 4 },
+    headStyles: { fillColor: [255, 138, 61], textColor: 255 },
+    margin: { left: 30, right: 30 },
+    didParseCell: (data) => {
+      if(data.section === 'body' && data.column.index === 1){
+        const v = data.cell.raw;
+        if(v === 'Já gozado' || v.startsWith('Já gozado')) data.cell.styles.textColor = [26, 138, 74];
+        else if(v === 'Em curso') data.cell.styles.textColor = [255, 138, 61];
+        else if(v === 'Planejado') data.cell.styles.textColor = [77, 158, 255];
+      }
+    }
+  });
 
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    }, 200);
-  };
+  const yFinal = doc.lastAutoTable.finalY + 24;
+  doc.setFontSize(12); doc.setFont(undefined, 'bold');
+  doc.text('Em alerta — 2º período próximo de também vencer', 30, yFinal);
+  doc.autoTable({
+    startY: yFinal + 8,
+    head: [['Nome', 'Próx. vencimento', 'Dias restantes']],
+    body: linhasAlerta.length ? linhasAlerta : [['Ninguém em alerta no momento.', '', '']],
+    styles: { fontSize: 8, cellPadding: 4 },
+    headStyles: { fillColor: [244, 196, 48], textColor: 30 },
+    margin: { left: 30, right: 30 }
+  });
+
+  const nomeArquivoPdf = `relatorio-ferias-${hoje.toISOString().slice(0,10)}.pdf`;
+  const blobPdf = doc.output('blob');
+  const salvouPdf = await salvarArquivo(blobPdf, nomeArquivoPdf, {
+    desc: 'Documento PDF',
+    accept: { 'application/pdf': ['.pdf'] }
+  });
+  if(salvouPdf) toast('PDF gerado');
 }
+function escapeHtmlPdf(s){ return String(s); }
 
 // ---------- Importar: texto colado ----------
 function parseDataBr(str){
@@ -2187,24 +2272,31 @@ async function confirmarImportTexto(){
   const raw = $('importText').value.trim();
   if(!raw){ toast('Cole ao menos uma linha'); return; }
   const linhas = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const existentesPorNomeTxt = {};
+  colaboradores.forEach(c => { existentesPorNomeTxt[c.nome.trim().toLowerCase()] = c; });
   const novos = [];
-  let ignorados = 0;
+  let ignorados = 0, jaExistiam = 0;
   linhas.forEach((linha, i) => {
     const partes = linha.split(';').map(p => p.trim());
     if(partes.length < 2){ ignorados++; return; }
     const nome = partes[0];
     const iso = parseDataBr(partes[1]);
     if(!nome || !iso){ ignorados++; return; }
+    if(existentesPorNomeTxt[nome.toLowerCase()]){ jaExistiam++; return; }
     const novo = {
       id: gerarId('c'),
-      nome, baseData: iso, periodosFechados: 0,
+      nome, baseData: iso, periodosFechados: 0, turno: '',
       lancamentos: [], statusAprovacao: null, obs:'', historico: []
     };
     colaboradores.push(novo);
     novos.push(novo);
   });
   await salvarVariosColaboradores(novos); fecharModalImport(); render();
-  toast(`${novos.length} importado(s)${ignorados ? `, ${ignorados} linha(s) ignorada(s)` : ''}`);
+  const partesTxt = [];
+  if(novos.length) partesTxt.push(`${novos.length} novo(s)`);
+  if(jaExistiam) partesTxt.push(`${jaExistiam} já existia(m) (mantidos como estavam)`);
+  if(ignorados) partesTxt.push(`${ignorados} linha(s) ignorada(s)`);
+  toast(partesTxt.join(', ') || 'Nenhuma mudança');
 }
 
 // ---------- Importar: Excel ----------
@@ -2242,8 +2334,10 @@ $('excelFile').addEventListener('change', function(e){
       const colDataSel = $('colData');
       const colDireitoSel = $('colDireito');
       const colRestoSel = $('colResto');
+      const colTurnoSel = $('colTurno');
       const opts = headers.map((h,i)=>`<option value="${i}">${escapeHtml(h)}</option>`).join('');
       colNomeSel.innerHTML = opts; colDataSel.innerHTML = opts; colDireitoSel.innerHTML = opts; colRestoSel.innerHTML = opts;
+      colTurnoSel.innerHTML = '<option value="">Não tenho essa coluna</option>' + opts;
 
       headers.forEach((h,i)=>{
         const hl = h.toLowerCase();
@@ -2252,6 +2346,7 @@ $('excelFile').addEventListener('change', function(e){
         else if(hl.includes('data') || hl.includes('admiss') || hl.includes('aquisit')) colDataSel.value = i;
         if(hl.includes('direito')) colDireitoSel.value = i;
         if(hl.includes('resto') || hl.includes('saldo')) colRestoSel.value = i;
+        if(hl.includes('turno')) colTurnoSel.value = i;
       });
 
       // auto-detecta planilha "com saldo" se achar colunas de Direito e Resto
@@ -2291,28 +2386,46 @@ async function confirmarImportExcel(){
   const idxData = parseInt($('colData').value, 10);
 
   if(!comSaldo){
+    const idxTurnoSimples = $('colTurno').value !== '' ? parseInt($('colTurno').value, 10) : -1;
+    const existentesPorNomeSimples = {};
+    colaboradores.forEach(c => { existentesPorNomeSimples[c.nome.trim().toLowerCase()] = c; });
     const novos = [];
-    let ignorados = 0;
+    const atualizados = [];
+    let ignorados = 0, jaExistiam = 0;
     excelRows.forEach((row, i) => {
       const nome = row[idxNome] ? String(row[idxNome]).trim() : '';
       const iso = parseDataCelulaISO(row[idxData]);
       if(!nome || !iso){ ignorados++; return; }
+      const turno = idxTurnoSimples >= 0 && row[idxTurnoSimples] ? String(row[idxTurnoSimples]).trim() : '';
+      const chave = nome.toLowerCase();
+      if(existentesPorNomeSimples[chave]){
+        jaExistiam++;
+        const jaExiste = existentesPorNomeSimples[chave];
+        if(turno && turno !== jaExiste.turno){ jaExiste.turno = turno; atualizados.push(jaExiste); }
+        return;
+      }
       const novo = {
         id: gerarId('c'),
-        nome, baseData: iso, periodosFechados: 0,
+        nome, baseData: iso, periodosFechados: 0, turno,
         lancamentos: [], statusAprovacao: null, obs:'', historico: []
       };
       colaboradores.push(novo);
       novos.push(novo);
     });
-    await salvarVariosColaboradores(novos); fecharModalImport(); render();
-    toast(`${novos.length} importado(s)${ignorados ? `, ${ignorados} linha(s) ignorada(s)` : ''}`);
+    await salvarVariosColaboradores([...novos, ...atualizados]); fecharModalImport(); render();
+    const partesSimples = [];
+    if(novos.length) partesSimples.push(`${novos.length} novo(s)`);
+    if(atualizados.length) partesSimples.push(`${atualizados.length} com turno atualizado`);
+    if(jaExistiam - atualizados.length > 0) partesSimples.push(`${jaExistiam - atualizados.length} já existiam (mantidos como estavam)`);
+    if(ignorados) partesSimples.push(`${ignorados} linha(s) ignorada(s)`);
+    toast(partesSimples.join(', ') || 'Nenhuma mudança');
     return;
   }
 
   // ---- Importação "com saldo": agrupa por nome, reconstrói base + uso já feito ----
   const idxDireito = parseInt($('colDireito').value, 10);
   const idxResto = parseInt($('colResto').value, 10);
+  const idxTurno = $('colTurno').value !== '' ? parseInt($('colTurno').value, 10) : -1;
 
   const grupos = {};
   let ignorados = 0;
@@ -2323,15 +2436,30 @@ async function confirmarImportExcel(){
     const resto = parseFloat(String(row[idxResto]).replace(',', '.'));
     if(!nome || !iso || isNaN(direito) || isNaN(resto)){ ignorados++; return; }
     const chave = nome.toLowerCase();
-    if(!grupos[chave]) grupos[chave] = { nome, linhas: [] };
+    if(!grupos[chave]) grupos[chave] = { nome, linhas: [], turno: idxTurno >= 0 && row[idxTurno] ? String(row[idxTurno]).trim() : '' };
     grupos[chave].linhas.push({ iso, direito, resto });
   });
 
-  const novos = [];
-  let i = 0;
-  Object.values(grupos).forEach(grupo => {
-    grupo.linhas.sort((a,b) => a.iso.localeCompare(b.iso));
+  // Mapa dos colaboradores JÁ existentes (por nome normalizado), pra nunca duplicar.
+  const existentesPorNome = {};
+  colaboradores.forEach(c => { existentesPorNome[c.nome.trim().toLowerCase()] = c; });
 
+  const novos = [];
+  const atualizados = [];
+  let i = 0;
+  Object.entries(grupos).forEach(([chave, grupo]) => {
+    const jaExiste = existentesPorNome[chave];
+    if(jaExiste){
+      // Colaborador já cadastrado: NUNCA mexe em saldo/parcelas/histórico já
+      // lançados — só atualiza o turno, se essa planilha trouxer essa coluna.
+      if(grupo.turno && grupo.turno !== jaExiste.turno){
+        jaExiste.turno = grupo.turno;
+        atualizados.push(jaExiste);
+      }
+      return;
+    }
+
+    grupo.linhas.sort((a,b) => a.iso.localeCompare(b.iso));
     let periodosFechados = 0;
     let idx = 0;
     // pula ciclos já totalmente consumidos (resto <= 0) no início da lista
@@ -2348,7 +2476,7 @@ async function confirmarImportExcel(){
 
     const novo = {
       id: gerarId('c'),
-      nome: grupo.nome, baseData, periodosFechados,
+      nome: grupo.nome, baseData, periodosFechados, turno: grupo.turno || '',
       lancamentos, statusAprovacao: null,
       obs: 'Importado de planilha com saldo (dados de referência de jan/2025)',
       historico: []
@@ -2358,8 +2486,12 @@ async function confirmarImportExcel(){
     i++;
   });
 
-  await salvarVariosColaboradores(novos); fecharModalImport(); render();
-  toast(`${novos.length} colaborador(es) importado(s) com saldo reconstruído${ignorados ? `, ${ignorados} linha(s) ignorada(s)` : ''}`);
+  await salvarVariosColaboradores([...novos, ...atualizados]); fecharModalImport(); render();
+  const partes = [];
+  if(novos.length) partes.push(`${novos.length} novo(s)`);
+  if(atualizados.length) partes.push(`${atualizados.length} com turno atualizado`);
+  if(ignorados) partes.push(`${ignorados} linha(s) ignorada(s)`);
+  toast(partes.length ? partes.join(', ') : 'Nenhuma mudança — todos já estavam cadastrados e sem turno novo');
 }
 
 function fecharModalImport(){
@@ -2463,12 +2595,12 @@ document.body.addEventListener('click', (e) => {
   else if(action === 'cal-dia') mostrarDetalheDia(btn.dataset.data);
 });
 
-// ---------- Autenticação (UI de login/logout) ----------
+// ---------- Autenticação (anônima e automática — sem tela de login) ----------
 function mostrarApp(){
   $('loginOverlay').classList.remove('open');
   $('appRoot').style.display = 'block';
 }
-function mostrarLogin(){
+function mostrarCarregando(){
   $('appRoot').style.display = 'none';
   $('loginOverlay').classList.add('open');
 }
@@ -2477,30 +2609,20 @@ if(firebaseReady){
   authInstance.onAuthStateChanged((user) => {
     currentUser = user;
     if(user){
-      $('userBar').style.display = 'flex';
-      $('userEmailTxt').textContent = user.email;
+      $('userBar').style.display = 'none'; // login anônimo não tem e-mail pra mostrar
       mostrarApp();
       loadData();
     } else {
-      mostrarLogin();
+      // Sem sessão ainda: entra sozinho, sem pedir nada — o usuário só abre e usa.
+      mostrarCarregando();
+      authInstance.signInAnonymously().catch(() => {
+        // Se por algum motivo o login anônimo falhar (ex.: não habilitado no
+        // console do Firebase), segue mesmo assim usando o armazenamento local.
+        mostrarApp();
+        loadData();
+      });
     }
   });
-
-  $('btnLogin').addEventListener('click', async () => {
-    const email = $('loginEmail').value.trim();
-    const senha = $('loginSenha').value;
-    $('loginErro').classList.remove('show');
-    if(!email || !senha){ $('loginErro').textContent = 'Preencha e-mail e senha.'; $('loginErro').classList.add('show'); return; }
-    try{
-      await authInstance.signInWithEmailAndPassword(email, senha);
-    }catch(e){
-      $('loginErro').textContent = 'E-mail ou senha inválidos.';
-      $('loginErro').classList.add('show');
-    }
-  });
-  $('loginSenha').addEventListener('keydown', (e) => { if(e.key === 'Enter') $('btnLogin').click(); });
-
-  $('btnLogout').addEventListener('click', () => authInstance.signOut());
 } else {
   // Sem Firebase disponível (ex.: dentro do Claude) — segue sem exigir login.
   mostrarApp();
