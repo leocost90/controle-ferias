@@ -2646,3 +2646,75 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 document.body.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   if(!btn) return;
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+
+  if(action === 'editar') editarColaborador(id);
+  else if(action === 'excluir') excluirColaborador(id);
+  else if(action === 'aprovacao') toggleAprovacao(id, btn.dataset.valor);
+  else if(action === 'encerrar') abrirEncerrar(id);
+  else if(action === 'lancar') abrirLancar(id);
+  else if(action === 'encerrar-ate') confirmarEncerrarAte(id, parseInt(btn.dataset.indice, 10));
+  else if(action === 'historico') abrirHistorico(id);
+  else if(action === 'reabrir-periodo') reabrirUltimoPeriodo(id);
+  else if(action === 'editar-parcela') abrirEditarParcela(id, btn.dataset.parcela);
+  else if(action === 'lancar-de-encerrar'){ $('modalEncerrar').classList.remove('open'); abrirLancar(id); }
+  else if(action === 'dash-aprovar') dashAprovar(id, btn.dataset.parcela);
+  else if(action === 'dash-reprovar') dashReprovar(id, btn.dataset.parcela);
+  else if(action === 'cal-dia') mostrarDetalheDia(btn.dataset.data);
+});
+
+// ---------- Autenticação (anônima e automática — sem tela de login) ----------
+function mostrarApp(){
+  $('loginOverlay').classList.remove('open');
+  $('appRoot').style.display = 'block';
+}
+function mostrarCarregando(){
+  $('appRoot').style.display = 'none';
+  $('loginOverlay').classList.add('open');
+}
+function mostrarErroConexao(mensagem){
+  $('appRoot').style.display = 'none';
+  $('loginOverlay').innerHTML = `
+    <div class="modal" style="max-width:340px; text-align:center;">
+      <h2 style="margin-bottom:6px; color:var(--vermelho);">⚠️ Não foi possível conectar</h2>
+      <p class="helptext" style="margin-bottom:14px;">${mensagem}</p>
+      <p class="helptext">Seus dados continuam salvos com segurança — isso é só uma falha de conexão neste acesso. Assim que o problema for resolvido, recarregue a página.</p>
+    </div>
+  `;
+  $('loginOverlay').classList.add('open');
+}
+
+if(firebaseReady){
+  authInstance.onAuthStateChanged((user) => {
+    currentUser = user;
+    if(user){
+      $('userBar').style.display = 'none'; // login anônimo não tem e-mail pra mostrar
+      mostrarApp();
+      loadData();
+    } else {
+      // Sem sessão ainda: entra sozinho, sem pedir nada — o usuário só abre e usa.
+      mostrarCarregando();
+      authInstance.signInAnonymously().catch((erro) => {
+        // Nunca segue silenciosamente com dados locais/vazios fingindo que está
+        // tudo certo — isso já causou confusão de "perdi meus dados" quando na
+        // verdade era só o Firebase recusando o domínio ou o login anônimo.
+        const dominioNaoAutorizado = erro && erro.code === 'auth/unauthorized-domain';
+        const msg = dominioNaoAutorizado
+          ? `O domínio <b>${location.hostname}</b> ainda não está autorizado no Firebase. No console: Authentication → Settings → Authorized domains → adicione esse domínio.`
+          : `Erro ao conectar: ${erro && erro.message ? erro.message : 'motivo desconhecido'}. Confira se o login anônimo está ativado em Authentication → Sign-in method.`;
+        mostrarErroConexao(msg);
+      });
+    }
+  });
+} else {
+  // Sem Firebase disponível (ex.: dentro do Claude) — segue sem exigir login.
+  mostrarApp();
+  loadData();
+}
+</script>
+
+</div><!-- fim #appRoot -->
+
+</body>
+</html>
