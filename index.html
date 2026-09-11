@@ -109,13 +109,17 @@
   .tabela-turno th{background:var(--panel-2); color:var(--ink-dim); font-size:.68rem; text-transform:uppercase;}
   .tabela-turno tr:nth-child(even) td{background:var(--panel-2);}
   .gerenciar-linha{
-    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    display:flex; flex-direction:column; gap:9px;
     background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
-    padding:9px 11px; margin-bottom:7px;
+    padding:10px 11px; margin-bottom:8px;
   }
-  .gerenciar-nome{font-weight:600; font-size:.85rem; width:100%; margin-bottom:2px;}
-  .gerenciar-turno-input{width:100px; flex:1; min-width:88px; font-size:.75rem; padding:6px 7px;}
-  .gerenciar-acoes{display:flex; gap:6px; margin-left:auto;}
+  .gerenciar-topo{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .gerenciar-nome{font-weight:700; font-size:.85rem;}
+  .gerenciar-campos{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;}
+  .gerenciar-campo{display:flex; flex-direction:column; gap:3px;}
+  .gerenciar-campo-label{font-size:.6rem; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.3px;}
+  .gerenciar-turno-input{width:100%; font-size:.75rem; padding:7px 8px;}
+  .gerenciar-acoes{display:flex; gap:6px; flex-shrink:0;}
   .turno-card{
     background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--accent);
     border-radius:8px; padding:10px 12px;
@@ -2084,14 +2088,30 @@ function renderGerenciarLista(){
 
   $('gerenciarLista').innerHTML = lista.length ? lista.map(c => `
     <div class="gerenciar-linha">
-      <span class="gerenciar-nome">${escapeHtml(c.nome)}</span>
-      <input type="date" class="gerenciar-turno-input" title="Data-base" value="${c.baseData || ''}" data-action="gerenciar-basedata" data-id="${c.id}">
-      <input type="text" class="gerenciar-turno-input" placeholder="Área" value="${escapeHtml(c.area || '')}" data-action="gerenciar-area" data-id="${c.id}">
-      <input type="text" class="gerenciar-turno-input" placeholder="Setor" value="${escapeHtml(c.setor || '')}" data-action="gerenciar-setor" data-id="${c.id}">
-      <input type="text" class="gerenciar-turno-input" placeholder="Turno" value="${escapeHtml(c.turno || '')}" data-action="gerenciar-turno" data-id="${c.id}">
-      <div class="gerenciar-acoes">
-        <button class="icon-btn" data-action="editar" data-id="${c.id}" title="Editar tudo">✎</button>
-        <button class="icon-btn" data-action="excluir" data-id="${c.id}" title="Excluir">🗑</button>
+      <div class="gerenciar-topo">
+        <span class="gerenciar-nome">${escapeHtml(c.nome)}</span>
+        <div class="gerenciar-acoes">
+          <button class="icon-btn" data-action="editar" data-id="${c.id}" title="Editar tudo">✎</button>
+          <button class="icon-btn" data-action="excluir" data-id="${c.id}" title="Excluir">🗑</button>
+        </div>
+      </div>
+      <div class="gerenciar-campos">
+        <div class="gerenciar-campo">
+          <span class="gerenciar-campo-label">Data-base</span>
+          <input type="date" class="gerenciar-turno-input" value="${c.baseData || ''}" data-action="gerenciar-basedata" data-id="${c.id}">
+        </div>
+        <div class="gerenciar-campo">
+          <span class="gerenciar-campo-label">Área</span>
+          <input type="text" class="gerenciar-turno-input" placeholder="Ex: Logística" value="${escapeHtml(c.area || '')}" data-action="gerenciar-area" data-id="${c.id}">
+        </div>
+        <div class="gerenciar-campo">
+          <span class="gerenciar-campo-label">Setor</span>
+          <input type="text" class="gerenciar-turno-input" placeholder="Ex: Expedição" value="${escapeHtml(c.setor || '')}" data-action="gerenciar-setor" data-id="${c.id}">
+        </div>
+        <div class="gerenciar-campo">
+          <span class="gerenciar-campo-label">Turno</span>
+          <input type="text" class="gerenciar-turno-input" placeholder="Ex: Manhã" value="${escapeHtml(c.turno || '')}" data-action="gerenciar-turno" data-id="${c.id}">
+        </div>
       </div>
     </div>
   `).join('') : '<div class="dash-empty">Nenhum colaborador encontrado.</div>';
