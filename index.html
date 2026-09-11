@@ -19,6 +19,7 @@
     --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
   *{box-sizing:border-box;}
+  html{font-size:18.5px;}
   body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); min-height:100vh;}
   header{
     padding:20px 16px 14px; border-bottom:1px solid var(--line);
@@ -103,6 +104,14 @@
   .cal-dia.nivel-alto .cal-badge{background:rgba(255,82,82,.18); color:var(--vermelho);}
 
   .turno-resumo{display:flex; flex-direction:column; gap:8px;}
+  .gerenciar-linha{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+    padding:9px 11px; margin-bottom:7px;
+  }
+  .gerenciar-nome{font-weight:600; font-size:.85rem; flex:1; min-width:140px;}
+  .gerenciar-turno-input{width:130px; font-size:.8rem; padding:6px 8px;}
+  .gerenciar-acoes{display:flex; gap:6px;}
   .turno-card{
     background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--accent);
     border-radius:8px; padding:10px 12px;
@@ -562,6 +571,11 @@
     </div>
 
     <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
+      <div class="helptext" style="margin-bottom:8px;">Base de dados completa — editar turno, dados ou excluir qualquer colaborador.</div>
+      <button class="btn btn-ghost" id="btnGerenciarColaboradores" style="width:100%;">📋 Gerenciar colaboradores</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
       <div class="helptext" style="margin-bottom:8px;">Exportar dados para backup ou consulta futura.</div>
       <button class="btn btn-ghost" id="btnExportar" style="width:100%; margin-bottom:8px;">📤 Exportar histórico de férias (.xlsx)</button>
       <button class="btn btn-ghost" id="btnExportarPDF" style="width:100%;">📄 Exportar relatório para reunião (PDF)</button>
@@ -582,6 +596,19 @@
     <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
       <div class="helptext" style="margin-bottom:8px;">Zona de risco — apaga dados, não dá pra desfazer.</div>
       <button class="btn btn-danger" id="btnApagarTudo" style="width:100%;">🗑 Apagar todos os colaboradores</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gerenciar colaboradores (base de dados) -->
+<div class="modal-overlay" id="modalGerenciar">
+  <div class="modal modal-wide modal-fullscreen">
+    <h2>Gerenciar colaboradores</h2>
+    <p class="helptext" style="margin-bottom:12px;">Edite o turno diretamente aqui, ou use os botões para editar tudo ou excluir.</p>
+    <input type="text" id="gerenciarBusca" placeholder="Buscar por nome..." style="width:100%; margin-bottom:12px;">
+    <div id="gerenciarLista"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelGerenciar" style="flex:1;">Fechar</button>
     </div>
   </div>
 </div>
@@ -1097,6 +1124,7 @@ function render(){
   $('cnt-segundo').textContent = counts.segundo;
   $('cnt-aquisicao').textContent = counts.aquisicao;
   atualizarMiniChips();
+  if($('modalGerenciar').classList.contains('open')) renderGerenciarLista();
 
   document.querySelectorAll('.chip').forEach(ch => ch.classList.toggle('active', ch.dataset.filter === filtroAtual));
 
@@ -2005,6 +2033,39 @@ async function salvarRegras(){
   toast('Regras atualizadas');
 }
 
+// ---------- Gerenciar colaboradores (base de dados) ----------
+function abrirGerenciar(){
+  $('gerenciarBusca').value = '';
+  renderGerenciarLista();
+  $('modalGerenciar').classList.add('open');
+}
+
+function renderGerenciarLista(){
+  const busca = $('gerenciarBusca').value.trim().toLowerCase();
+  const lista = [...colaboradores]
+    .filter(c => !busca || c.nome.toLowerCase().includes(busca))
+    .sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  $('gerenciarLista').innerHTML = lista.length ? lista.map(c => `
+    <div class="gerenciar-linha">
+      <span class="gerenciar-nome">${escapeHtml(c.nome)}</span>
+      <input type="text" class="gerenciar-turno-input" placeholder="Turno" value="${escapeHtml(c.turno || '')}" data-action="gerenciar-turno" data-id="${c.id}">
+      <div class="gerenciar-acoes">
+        <button class="icon-btn" data-action="editar" data-id="${c.id}" title="Editar tudo">✎</button>
+        <button class="icon-btn" data-action="excluir" data-id="${c.id}" title="Excluir">🗑</button>
+      </div>
+    </div>
+  `).join('') : '<div class="dash-empty">Nenhum colaborador encontrado.</div>';
+}
+
+async function atualizarTurnoGerenciar(id, novoTurno){
+  const c = colaboradores.find(x => x.id === id);
+  if(!c) return;
+  c.turno = novoTurno.trim();
+  await saveColaborador(c);
+  render();
+}
+
 async function apagarTudo(){
   const ok1 = await askConfirm(
     `Isso vai apagar TODOS os ${colaboradores.length} colaborador(es) cadastrados, incluindo saldos, lançamentos e histórico. Essa ação não pode ser desfeita.`,
@@ -2555,6 +2616,14 @@ $('btnRegras').onclick = abrirRegras;
 $('btnCancelRegras').onclick = () => $('modalRegras').classList.remove('open');
 $('btnSaveRegras').onclick = salvarRegras;
 $('btnApagarTudo').onclick = apagarTudo;
+$('btnGerenciarColaboradores').onclick = abrirGerenciar;
+$('btnCancelGerenciar').onclick = () => $('modalGerenciar').classList.remove('open');
+$('gerenciarBusca').oninput = renderGerenciarLista;
+$('gerenciarLista').addEventListener('change', (e) => {
+  const input = e.target.closest('[data-action="gerenciar-turno"]');
+  if(!input) return;
+  atualizarTurnoGerenciar(input.dataset.id, input.value);
+});
 $('btnExportar').onclick = exportarHistorico;
 $('btnExportarPDF').onclick = exportarPDF;
 $('btnLimparHistorico').onclick = limparHistorico;
@@ -2577,75 +2646,3 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 document.body.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   if(!btn) return;
-  const action = btn.dataset.action;
-  const id = btn.dataset.id;
-
-  if(action === 'editar') editarColaborador(id);
-  else if(action === 'excluir') excluirColaborador(id);
-  else if(action === 'aprovacao') toggleAprovacao(id, btn.dataset.valor);
-  else if(action === 'encerrar') abrirEncerrar(id);
-  else if(action === 'lancar') abrirLancar(id);
-  else if(action === 'encerrar-ate') confirmarEncerrarAte(id, parseInt(btn.dataset.indice, 10));
-  else if(action === 'historico') abrirHistorico(id);
-  else if(action === 'reabrir-periodo') reabrirUltimoPeriodo(id);
-  else if(action === 'editar-parcela') abrirEditarParcela(id, btn.dataset.parcela);
-  else if(action === 'lancar-de-encerrar'){ $('modalEncerrar').classList.remove('open'); abrirLancar(id); }
-  else if(action === 'dash-aprovar') dashAprovar(id, btn.dataset.parcela);
-  else if(action === 'dash-reprovar') dashReprovar(id, btn.dataset.parcela);
-  else if(action === 'cal-dia') mostrarDetalheDia(btn.dataset.data);
-});
-
-// ---------- Autenticação (anônima e automática — sem tela de login) ----------
-function mostrarApp(){
-  $('loginOverlay').classList.remove('open');
-  $('appRoot').style.display = 'block';
-}
-function mostrarCarregando(){
-  $('appRoot').style.display = 'none';
-  $('loginOverlay').classList.add('open');
-}
-function mostrarErroConexao(mensagem){
-  $('appRoot').style.display = 'none';
-  $('loginOverlay').innerHTML = `
-    <div class="modal" style="max-width:340px; text-align:center;">
-      <h2 style="margin-bottom:6px; color:var(--vermelho);">⚠️ Não foi possível conectar</h2>
-      <p class="helptext" style="margin-bottom:14px;">${mensagem}</p>
-      <p class="helptext">Seus dados continuam salvos com segurança — isso é só uma falha de conexão neste acesso. Assim que o problema for resolvido, recarregue a página.</p>
-    </div>
-  `;
-  $('loginOverlay').classList.add('open');
-}
-
-if(firebaseReady){
-  authInstance.onAuthStateChanged((user) => {
-    currentUser = user;
-    if(user){
-      $('userBar').style.display = 'none'; // login anônimo não tem e-mail pra mostrar
-      mostrarApp();
-      loadData();
-    } else {
-      // Sem sessão ainda: entra sozinho, sem pedir nada — o usuário só abre e usa.
-      mostrarCarregando();
-      authInstance.signInAnonymously().catch((erro) => {
-        // Nunca segue silenciosamente com dados locais/vazios fingindo que está
-        // tudo certo — isso já causou confusão de "perdi meus dados" quando na
-        // verdade era só o Firebase recusando o domínio ou o login anônimo.
-        const dominioNaoAutorizado = erro && erro.code === 'auth/unauthorized-domain';
-        const msg = dominioNaoAutorizado
-          ? `O domínio <b>${location.hostname}</b> ainda não está autorizado no Firebase. No console: Authentication → Settings → Authorized domains → adicione esse domínio.`
-          : `Erro ao conectar: ${erro && erro.message ? erro.message : 'motivo desconhecido'}. Confira se o login anônimo está ativado em Authentication → Sign-in method.`;
-        mostrarErroConexao(msg);
-      });
-    }
-  });
-} else {
-  // Sem Firebase disponível (ex.: dentro do Claude) — segue sem exigir login.
-  mostrarApp();
-  loadData();
-}
-</script>
-
-</div><!-- fim #appRoot -->
-
-</body>
-</html>
