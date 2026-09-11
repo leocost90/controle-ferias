@@ -377,6 +377,11 @@
   </select>
   <button class="btn btn-ghost" id="btnImport">Importar</button>
 </div>
+<div class="toolbar" style="padding-top:0;">
+  <select id="filtroTurno" style="flex:1;">
+    <option value="">Todos os turnos</option>
+  </select>
+</div>
 
 <main id="list"></main>
 
@@ -1139,6 +1144,16 @@ async function saveRegras(){ try{ await storageSet(REGRAS_KEY, JSON.stringify(re
 function render(){
   const busca = $('search').value.trim().toLowerCase();
   const ordenacao = $('sortSelect').value;
+  const turnoFiltro = $('filtroTurno').value;
+
+  // repopula as opções de turno com o que existir de fato entre os colaboradores
+  const turnosExistentes = [...new Set(colaboradores.map(c => (c.turno || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'pt-BR'));
+  const opcoesAtuais = [...$('filtroTurno').options].map(o => o.value).slice(1).join('|');
+  if(opcoesAtuais !== turnosExistentes.join('|')){
+    const valorSelecionado = $('filtroTurno').value;
+    $('filtroTurno').innerHTML = '<option value="">Todos os turnos</option>' + turnosExistentes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+    if(turnosExistentes.includes(valorSelecionado)) $('filtroTurno').value = valorSelecionado;
+  }
 
   const enriquecidos = colaboradores.map(c => ({ ...c, status: calcularStatus(c) }));
 
@@ -1171,6 +1186,7 @@ function render(){
     } else if(filtroAtual === 'aquisicao'){
       if(!c.status.emAquisicao) return false;
     } else if(filtroAtual !== 'all' && (c.status.emAquisicao || c.status.cor !== filtroAtual)) return false;
+    if(turnoFiltro && (c.turno || '').trim() !== turnoFiltro) return false;
     if(busca && !c.nome.toLowerCase().includes(busca)) return false;
     return true;
   });
@@ -2720,6 +2736,7 @@ $('btnExportarPDF').onclick = exportarPDF;
 $('btnLimparHistorico').onclick = limparHistorico;
 $('search').oninput = render;
 $('sortSelect').onchange = render;
+$('filtroTurno').onchange = render;
 $('thresholdSelect').onchange = async (e) => { thresholdAmarelo = parseInt(e.target.value, 10); await saveThreshold(); render(); };
 document.querySelectorAll('.chip').forEach(chip=>{ chip.onclick = () => { filtroAtual = chip.dataset.filter; render(); }; });
 document.querySelectorAll('.tab-btn').forEach(btn=>{
