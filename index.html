@@ -103,15 +103,19 @@
   .cal-dia.nivel-medio .cal-badge{background:rgba(244,196,48,.18); color:var(--amarelo);}
   .cal-dia.nivel-alto .cal-badge{background:rgba(255,82,82,.18); color:var(--vermelho);}
 
-  .turno-resumo{display:flex; flex-direction:column; gap:8px;}
+  .turno-resumo{display:flex; flex-direction:column; gap:8px; overflow-x:auto;}
+  .tabela-turno{width:100%; border-collapse:collapse; font-size:.78rem;}
+  .tabela-turno th, .tabela-turno td{border:1px solid var(--line); padding:7px 9px; text-align:left; white-space:nowrap;}
+  .tabela-turno th{background:var(--panel-2); color:var(--ink-dim); font-size:.68rem; text-transform:uppercase;}
+  .tabela-turno tr:nth-child(even) td{background:var(--panel-2);}
   .gerenciar-linha{
-    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
     background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
     padding:9px 11px; margin-bottom:7px;
   }
-  .gerenciar-nome{font-weight:600; font-size:.85rem; flex:1; min-width:140px;}
-  .gerenciar-turno-input{width:130px; font-size:.8rem; padding:6px 8px;}
-  .gerenciar-acoes{display:flex; gap:6px;}
+  .gerenciar-nome{font-weight:600; font-size:.85rem; width:100%; margin-bottom:2px;}
+  .gerenciar-turno-input{width:100px; flex:1; min-width:88px; font-size:.75rem; padding:6px 7px;}
+  .gerenciar-acoes{display:flex; gap:6px; margin-left:auto;}
   .turno-card{
     background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--accent);
     border-radius:8px; padding:10px 12px;
@@ -390,13 +394,23 @@
         Pode ser a data de admissão OU a data de início de um período de férias anterior já conhecido — o que importa é ser o começo do ciclo de 12 meses que ainda está em aberto (vencido ou em aquisição).
       </div>
     </div>
+    <div class="row2">
+      <div class="field">
+        <label>Área (opcional)</label>
+        <input type="text" id="fArea" placeholder="Ex: Logística">
+      </div>
+      <div class="field">
+        <label>Setor (opcional)</label>
+        <input type="text" id="fSetor" placeholder="Ex: Expedição">
+      </div>
+    </div>
     <div class="field">
       <label>Turno (opcional)</label>
       <input type="text" id="fTurno" placeholder="Ex: Manhã, Tarde, Noite">
     </div>
     <div class="field">
       <label>Observação (opcional)</label>
-      <input type="text" id="fObs" placeholder="Ex: setor...">
+      <input type="text" id="fObs" placeholder="Ex: outros detalhes...">
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btnCancelForm">Cancelar</button>
@@ -445,6 +459,16 @@
             <select id="colResto"></select>
           </div>
         </div>
+        <div class="row2">
+          <div class="field">
+            <label>Coluna da área (opcional)</label>
+            <select id="colArea"><option value="">Não tenho essa coluna</option></select>
+          </div>
+          <div class="field">
+            <label>Coluna do setor (opcional)</label>
+            <select id="colSetor"><option value="">Não tenho essa coluna</option></select>
+          </div>
+        </div>
         <div class="field">
           <label>Coluna do turno (opcional)</label>
           <select id="colTurno">
@@ -452,7 +476,7 @@
           </select>
         </div>
         <div class="helptext" style="margin-bottom:8px;">
-          Se algum nome dessa planilha já existir no app, ele <b>não será duplicado</b> — só o turno é atualizado, e todo o saldo/histórico/parcelas que já estavam lançados continuam intactos.
+          Se algum nome dessa planilha já existir no app, ele <b>não será duplicado</b> — só área/setor/turno são atualizados, e todo o saldo/histórico/parcelas que já estavam lançados continuam intactos.
         </div>
         <div class="helptext">
           Se marcar a opção acima: o app agrupa as linhas por nome, usa a data mais antiga como base e reconstrói automaticamente os dias já usados (Direito - Total resto) como uma parcela histórica — assim o saldo já entra correto.
@@ -604,7 +628,8 @@
 <div class="modal-overlay" id="modalGerenciar">
   <div class="modal modal-wide modal-fullscreen">
     <h2>Gerenciar colaboradores</h2>
-    <p class="helptext" style="margin-bottom:12px;">Edite o turno diretamente aqui, ou use os botões para editar tudo ou excluir.</p>
+    <p class="helptext" style="margin-bottom:12px;">Edite área, setor e turno diretamente aqui, ou use os botões para editar tudo ou excluir.</p>
+    <button class="btn btn-primary" id="btnAdicionarDoGerenciar" style="width:100%; margin-bottom:12px;">+ Adicionar colaborador</button>
     <input type="text" id="gerenciarBusca" placeholder="Buscar por nome..." style="width:100%; margin-bottom:12px;">
     <div id="gerenciarLista"></div>
     <div class="modal-actions">
@@ -660,7 +685,7 @@
       </div>
     </div>
 
-    <h3 class="dash-secao" style="margin-top:24px;">👥 Em férias agora, por turno</h3>
+    <h3 class="dash-secao" style="margin-top:24px;">👥 Em férias agora — nome, área, setor e turno</h3>
     <div id="turnoResumo" class="turno-resumo"></div>
 
     <h3 class="dash-secao" style="margin-top:24px;">📅 Calendário de cobertura</h3>
@@ -828,6 +853,10 @@ let regras = { ...REGRAS_PADRAO };
 let excelRows = null;
 
 const $ = (id) => document.getElementById(id);
+// Preenche um campo sem quebrar tudo caso ele não exista por algum motivo
+// (ex.: página aberta com HTML desatualizado em relação ao script).
+function setVal(id, val){ const el = $(id); if(el) el.value = val; }
+function getVal(id){ const el = $(id); return el ? el.value : ''; }
 
 function toast(msg){
   const t = $('toast');
@@ -1221,6 +1250,8 @@ function render(){
           ${alertaProximoVenc ? `<div class="alerta-proximo">⏳ Faltam ${st.diasParaProximoVencimento}d para o período seguinte também vencer (ficaria com ${st.ciclosAbertos + 1} períodos empilhados)</div>` : ''}
           <div class="meta">
             <span>Data-base: <b>${fmtData(parseISO(c.baseData))}</b></span>
+            ${c.area ? `<span>Área: <b>${escapeHtml(c.area)}</b></span>` : ''}
+            ${c.setor ? `<span>Setor: <b>${escapeHtml(c.setor)}</b></span>` : ''}
             ${c.turno ? `<span>Turno: <b>${escapeHtml(c.turno)}</b></span>` : ''}
             <span>Venc. período mais antigo: <b>${fmtData(st.vencPeriodo)}</b></span>
             <span>Limite (prazo legal): <b>${fmtData(st.limite)}</b></span>
@@ -1258,14 +1289,14 @@ function escapeHtml(s){
 // ---------- CRUD colaborador ----------
 function abrirFormNovo(){
   $('formTitle').textContent = 'Novo colaborador';
-  $('editId').value = ''; $('fNome').value = ''; $('fData').value = ''; $('fTurno').value = ''; $('fObs').value = '';
+  setVal('editId',''); setVal('fNome',''); setVal('fData',''); setVal('fArea',''); setVal('fSetor',''); setVal('fTurno',''); setVal('fObs','');
   $('modalForm').classList.add('open');
 }
 function editarColaborador(id){
   const c = colaboradores.find(x => x.id === id);
   if(!c) return;
   $('formTitle').textContent = 'Editar colaborador';
-  $('editId').value = c.id; $('fNome').value = c.nome; $('fData').value = c.baseData; $('fTurno').value = c.turno || ''; $('fObs').value = c.obs || '';
+  setVal('editId', c.id); setVal('fNome', c.nome); setVal('fData', c.baseData); setVal('fArea', c.area || ''); setVal('fSetor', c.setor || ''); setVal('fTurno', c.turno || ''); setVal('fObs', c.obs || '');
   $('modalForm').classList.add('open');
 }
 async function excluirColaborador(id){
@@ -1276,21 +1307,23 @@ async function excluirColaborador(id){
   await excluirColaboradorRemoto(id); render(); toast('Colaborador excluído');
 }
 async function salvarForm(){
-  const nome = $('fNome').value.trim();
-  const dataStr = $('fData').value;
-  const turno = $('fTurno').value.trim();
-  const obs = $('fObs').value.trim();
-  const editId = $('editId').value;
+  const nome = getVal('fNome').trim();
+  const dataStr = getVal('fData');
+  const area = getVal('fArea').trim();
+  const setor = getVal('fSetor').trim();
+  const turno = getVal('fTurno').trim();
+  const obs = getVal('fObs').trim();
+  const editId = getVal('editId');
   if(!nome){ toast('Informe o nome'); return; }
   if(!dataStr){ toast('Informe a data-base'); return; }
   let alvo;
   if(editId){
     alvo = colaboradores.find(x => x.id === editId);
-    alvo.nome = nome; alvo.baseData = dataStr; alvo.turno = turno; alvo.obs = obs;
+    alvo.nome = nome; alvo.baseData = dataStr; alvo.area = area; alvo.setor = setor; alvo.turno = turno; alvo.obs = obs;
   } else {
     alvo = {
       id: gerarId('c'),
-      nome, baseData: dataStr, periodosFechados: 0, turno,
+      nome, baseData: dataStr, periodosFechados: 0, area, setor, turno,
       lancamentos: [], statusAprovacao: null, obs, historico: []
     };
     colaboradores.push(alvo);
@@ -1683,27 +1716,26 @@ function mostrarDetalheDia(dataISO){
 
 function renderResumoTurno(){
   const { emFerias } = calcularListasDashboard();
-  const porTurno = {};
-  emFerias.forEach(p => {
-    const turno = p.colaborador.turno && p.colaborador.turno.trim() ? p.colaborador.turno.trim() : 'Sem turno definido';
-    if(!porTurno[turno]) porTurno[turno] = [];
-    porTurno[turno].push(p.colaborador.nome);
-  });
-
-  const turnos = Object.keys(porTurno).sort();
-  if(turnos.length === 0){
+  if(emFerias.length === 0){
     $('turnoResumo').innerHTML = '<div class="dash-empty">Ninguém em férias no momento.</div>';
     return;
   }
-  $('turnoResumo').innerHTML = turnos.map(turno => `
-    <div class="turno-card">
-      <div class="turno-card-top">
-        <span class="turno-card-nome">${escapeHtml(turno)}</span>
-        <span class="turno-card-n">${porTurno[turno].length}</span>
-      </div>
-      <div class="turno-card-nomes">${porTurno[turno].map(escapeHtml).join(', ')}</div>
-    </div>
-  `).join('');
+  const linhas = [...emFerias].sort((a,b) => a.colaborador.nome.localeCompare(b.colaborador.nome, 'pt-BR'));
+  $('turnoResumo').innerHTML = `
+    <table class="tabela-turno">
+      <thead><tr><th>Nome</th><th>Área</th><th>Setor</th><th>Turno</th></tr></thead>
+      <tbody>
+        ${linhas.map(p => `
+          <tr>
+            <td>${escapeHtml(p.colaborador.nome)}</td>
+            <td>${escapeHtml(p.colaborador.area || '—')}</td>
+            <td>${escapeHtml(p.colaborador.setor || '—')}</td>
+            <td>${escapeHtml(p.colaborador.turno || '—')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 function abrirDashboard(){
@@ -2049,6 +2081,8 @@ function renderGerenciarLista(){
   $('gerenciarLista').innerHTML = lista.length ? lista.map(c => `
     <div class="gerenciar-linha">
       <span class="gerenciar-nome">${escapeHtml(c.nome)}</span>
+      <input type="text" class="gerenciar-turno-input" placeholder="Área" value="${escapeHtml(c.area || '')}" data-action="gerenciar-area" data-id="${c.id}">
+      <input type="text" class="gerenciar-turno-input" placeholder="Setor" value="${escapeHtml(c.setor || '')}" data-action="gerenciar-setor" data-id="${c.id}">
       <input type="text" class="gerenciar-turno-input" placeholder="Turno" value="${escapeHtml(c.turno || '')}" data-action="gerenciar-turno" data-id="${c.id}">
       <div class="gerenciar-acoes">
         <button class="icon-btn" data-action="editar" data-id="${c.id}" title="Editar tudo">✎</button>
@@ -2058,10 +2092,10 @@ function renderGerenciarLista(){
   `).join('') : '<div class="dash-empty">Nenhum colaborador encontrado.</div>';
 }
 
-async function atualizarTurnoGerenciar(id, novoTurno){
+async function atualizarCampoGerenciar(id, campo, valor){
   const c = colaboradores.find(x => x.id === id);
   if(!c) return;
-  c.turno = novoTurno.trim();
+  c[campo] = valor.trim();
   await saveColaborador(c);
   render();
 }
@@ -2396,9 +2430,13 @@ $('excelFile').addEventListener('change', function(e){
       const colDireitoSel = $('colDireito');
       const colRestoSel = $('colResto');
       const colTurnoSel = $('colTurno');
+      const colAreaSel = $('colArea');
+      const colSetorSel = $('colSetor');
       const opts = headers.map((h,i)=>`<option value="${i}">${escapeHtml(h)}</option>`).join('');
       colNomeSel.innerHTML = opts; colDataSel.innerHTML = opts; colDireitoSel.innerHTML = opts; colRestoSel.innerHTML = opts;
       colTurnoSel.innerHTML = '<option value="">Não tenho essa coluna</option>' + opts;
+      colAreaSel.innerHTML = '<option value="">Não tenho essa coluna</option>' + opts;
+      colSetorSel.innerHTML = '<option value="">Não tenho essa coluna</option>' + opts;
 
       headers.forEach((h,i)=>{
         const hl = h.toLowerCase();
@@ -2408,6 +2446,8 @@ $('excelFile').addEventListener('change', function(e){
         if(hl.includes('direito')) colDireitoSel.value = i;
         if(hl.includes('resto') || hl.includes('saldo')) colRestoSel.value = i;
         if(hl.includes('turno')) colTurnoSel.value = i;
+        if(hl.includes('área') || hl.includes('area')) colAreaSel.value = i;
+        if(hl.includes('setor')) colSetorSel.value = i;
       });
 
       // auto-detecta planilha "com saldo" se achar colunas de Direito e Resto
@@ -2448,6 +2488,8 @@ async function confirmarImportExcel(){
 
   if(!comSaldo){
     const idxTurnoSimples = $('colTurno').value !== '' ? parseInt($('colTurno').value, 10) : -1;
+    const idxAreaSimples = $('colArea').value !== '' ? parseInt($('colArea').value, 10) : -1;
+    const idxSetorSimples = $('colSetor').value !== '' ? parseInt($('colSetor').value, 10) : -1;
     const existentesPorNomeSimples = {};
     colaboradores.forEach(c => { existentesPorNomeSimples[c.nome.trim().toLowerCase()] = c; });
     const novos = [];
@@ -2458,16 +2500,22 @@ async function confirmarImportExcel(){
       const iso = parseDataCelulaISO(row[idxData]);
       if(!nome || !iso){ ignorados++; return; }
       const turno = idxTurnoSimples >= 0 && row[idxTurnoSimples] ? String(row[idxTurnoSimples]).trim() : '';
+      const area = idxAreaSimples >= 0 && row[idxAreaSimples] ? String(row[idxAreaSimples]).trim() : '';
+      const setor = idxSetorSimples >= 0 && row[idxSetorSimples] ? String(row[idxSetorSimples]).trim() : '';
       const chave = nome.toLowerCase();
       if(existentesPorNomeSimples[chave]){
         jaExistiam++;
         const jaExiste = existentesPorNomeSimples[chave];
-        if(turno && turno !== jaExiste.turno){ jaExiste.turno = turno; atualizados.push(jaExiste); }
+        let mudou = false;
+        if(turno && turno !== jaExiste.turno){ jaExiste.turno = turno; mudou = true; }
+        if(area && area !== jaExiste.area){ jaExiste.area = area; mudou = true; }
+        if(setor && setor !== jaExiste.setor){ jaExiste.setor = setor; mudou = true; }
+        if(mudou) atualizados.push(jaExiste);
         return;
       }
       const novo = {
         id: gerarId('c'),
-        nome, baseData: iso, periodosFechados: 0, turno,
+        nome, baseData: iso, periodosFechados: 0, turno, area, setor,
         lancamentos: [], statusAprovacao: null, obs:'', historico: []
       };
       colaboradores.push(novo);
@@ -2476,7 +2524,7 @@ async function confirmarImportExcel(){
     await salvarVariosColaboradores([...novos, ...atualizados]); fecharModalImport(); render();
     const partesSimples = [];
     if(novos.length) partesSimples.push(`${novos.length} novo(s)`);
-    if(atualizados.length) partesSimples.push(`${atualizados.length} com turno atualizado`);
+    if(atualizados.length) partesSimples.push(`${atualizados.length} atualizado(s)`);
     if(jaExistiam - atualizados.length > 0) partesSimples.push(`${jaExistiam - atualizados.length} já existiam (mantidos como estavam)`);
     if(ignorados) partesSimples.push(`${ignorados} linha(s) ignorada(s)`);
     toast(partesSimples.join(', ') || 'Nenhuma mudança');
@@ -2487,6 +2535,8 @@ async function confirmarImportExcel(){
   const idxDireito = parseInt($('colDireito').value, 10);
   const idxResto = parseInt($('colResto').value, 10);
   const idxTurno = $('colTurno').value !== '' ? parseInt($('colTurno').value, 10) : -1;
+  const idxArea = $('colArea').value !== '' ? parseInt($('colArea').value, 10) : -1;
+  const idxSetor = $('colSetor').value !== '' ? parseInt($('colSetor').value, 10) : -1;
 
   const grupos = {};
   let ignorados = 0;
@@ -2497,7 +2547,12 @@ async function confirmarImportExcel(){
     const resto = parseFloat(String(row[idxResto]).replace(',', '.'));
     if(!nome || !iso || isNaN(direito) || isNaN(resto)){ ignorados++; return; }
     const chave = nome.toLowerCase();
-    if(!grupos[chave]) grupos[chave] = { nome, linhas: [], turno: idxTurno >= 0 && row[idxTurno] ? String(row[idxTurno]).trim() : '' };
+    if(!grupos[chave]) grupos[chave] = {
+      nome, linhas: [],
+      turno: idxTurno >= 0 && row[idxTurno] ? String(row[idxTurno]).trim() : '',
+      area: idxArea >= 0 && row[idxArea] ? String(row[idxArea]).trim() : '',
+      setor: idxSetor >= 0 && row[idxSetor] ? String(row[idxSetor]).trim() : ''
+    };
     grupos[chave].linhas.push({ iso, direito, resto });
   });
 
@@ -2512,11 +2567,12 @@ async function confirmarImportExcel(){
     const jaExiste = existentesPorNome[chave];
     if(jaExiste){
       // Colaborador já cadastrado: NUNCA mexe em saldo/parcelas/histórico já
-      // lançados — só atualiza o turno, se essa planilha trouxer essa coluna.
-      if(grupo.turno && grupo.turno !== jaExiste.turno){
-        jaExiste.turno = grupo.turno;
-        atualizados.push(jaExiste);
-      }
+      // lançados — só atualiza área/setor/turno, se essa planilha trouxer essas colunas.
+      let mudou = false;
+      if(grupo.turno && grupo.turno !== jaExiste.turno){ jaExiste.turno = grupo.turno; mudou = true; }
+      if(grupo.area && grupo.area !== jaExiste.area){ jaExiste.area = grupo.area; mudou = true; }
+      if(grupo.setor && grupo.setor !== jaExiste.setor){ jaExiste.setor = grupo.setor; mudou = true; }
+      if(mudou) atualizados.push(jaExiste);
       return;
     }
 
@@ -2537,7 +2593,7 @@ async function confirmarImportExcel(){
 
     const novo = {
       id: gerarId('c'),
-      nome: grupo.nome, baseData, periodosFechados, turno: grupo.turno || '',
+      nome: grupo.nome, baseData, periodosFechados, turno: grupo.turno || '', area: grupo.area || '', setor: grupo.setor || '',
       lancamentos, statusAprovacao: null,
       obs: 'Importado de planilha com saldo (dados de referência de jan/2025)',
       historico: []
@@ -2550,9 +2606,9 @@ async function confirmarImportExcel(){
   await salvarVariosColaboradores([...novos, ...atualizados]); fecharModalImport(); render();
   const partes = [];
   if(novos.length) partes.push(`${novos.length} novo(s)`);
-  if(atualizados.length) partes.push(`${atualizados.length} com turno atualizado`);
+  if(atualizados.length) partes.push(`${atualizados.length} atualizado(s)`);
   if(ignorados) partes.push(`${ignorados} linha(s) ignorada(s)`);
-  toast(partes.length ? partes.join(', ') : 'Nenhuma mudança — todos já estavam cadastrados e sem turno novo');
+  toast(partes.length ? partes.join(', ') : 'Nenhuma mudança — todos já estavam cadastrados e sem informação nova');
 }
 
 function fecharModalImport(){
@@ -2618,11 +2674,13 @@ $('btnSaveRegras').onclick = salvarRegras;
 $('btnApagarTudo').onclick = apagarTudo;
 $('btnGerenciarColaboradores').onclick = abrirGerenciar;
 $('btnCancelGerenciar').onclick = () => $('modalGerenciar').classList.remove('open');
+$('btnAdicionarDoGerenciar').onclick = () => { $('modalGerenciar').classList.remove('open'); abrirFormNovo(); };
 $('gerenciarBusca').oninput = renderGerenciarLista;
 $('gerenciarLista').addEventListener('change', (e) => {
-  const input = e.target.closest('[data-action="gerenciar-turno"]');
+  const input = e.target.closest('[data-action="gerenciar-area"], [data-action="gerenciar-setor"], [data-action="gerenciar-turno"]');
   if(!input) return;
-  atualizarTurnoGerenciar(input.dataset.id, input.value);
+  const campo = input.dataset.action === 'gerenciar-area' ? 'area' : (input.dataset.action === 'gerenciar-setor' ? 'setor' : 'turno');
+  atualizarCampoGerenciar(input.dataset.id, campo, input.value);
 });
 $('btnExportar').onclick = exportarHistorico;
 $('btnExportarPDF').onclick = exportarPDF;
@@ -2649,7 +2707,7 @@ document.body.addEventListener('click', (e) => {
   const action = btn.dataset.action;
   const id = btn.dataset.id;
 
-  if(action === 'editar') editarColaborador(id);
+  if(action === 'editar'){ $('modalGerenciar').classList.remove('open'); editarColaborador(id); }
   else if(action === 'excluir') excluirColaborador(id);
   else if(action === 'aprovacao') toggleAprovacao(id, btn.dataset.valor);
   else if(action === 'encerrar') abrirEncerrar(id);
