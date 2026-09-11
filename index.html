@@ -396,16 +396,16 @@
     </div>
     <div class="row2">
       <div class="field">
-        <label>Área (opcional)</label>
+        <label>Área</label>
         <input type="text" id="fArea" placeholder="Ex: Logística">
       </div>
       <div class="field">
-        <label>Setor (opcional)</label>
+        <label>Setor</label>
         <input type="text" id="fSetor" placeholder="Ex: Expedição">
       </div>
     </div>
     <div class="field">
-      <label>Turno (opcional)</label>
+      <label>Turno</label>
       <input type="text" id="fTurno" placeholder="Ex: Manhã, Tarde, Noite">
     </div>
     <div class="field">
@@ -1316,6 +1316,9 @@ async function salvarForm(){
   const editId = getVal('editId');
   if(!nome){ toast('Informe o nome'); return; }
   if(!dataStr){ toast('Informe a data-base'); return; }
+  if(!area){ toast('Informe a área'); return; }
+  if(!setor){ toast('Informe o setor'); return; }
+  if(!turno){ toast('Informe o turno'); return; }
   let alvo;
   if(editId){
     alvo = colaboradores.find(x => x.id === editId);
@@ -2067,6 +2070,7 @@ async function salvarRegras(){
 
 // ---------- Gerenciar colaboradores (base de dados) ----------
 function abrirGerenciar(){
+  $('modalRegras').classList.remove('open'); // nunca deixa o de baixo aberto escondido
   $('gerenciarBusca').value = '';
   renderGerenciarLista();
   $('modalGerenciar').classList.add('open');
@@ -2081,6 +2085,7 @@ function renderGerenciarLista(){
   $('gerenciarLista').innerHTML = lista.length ? lista.map(c => `
     <div class="gerenciar-linha">
       <span class="gerenciar-nome">${escapeHtml(c.nome)}</span>
+      <input type="date" class="gerenciar-turno-input" title="Data-base" value="${c.baseData || ''}" data-action="gerenciar-basedata" data-id="${c.id}">
       <input type="text" class="gerenciar-turno-input" placeholder="Área" value="${escapeHtml(c.area || '')}" data-action="gerenciar-area" data-id="${c.id}">
       <input type="text" class="gerenciar-turno-input" placeholder="Setor" value="${escapeHtml(c.setor || '')}" data-action="gerenciar-setor" data-id="${c.id}">
       <input type="text" class="gerenciar-turno-input" placeholder="Turno" value="${escapeHtml(c.turno || '')}" data-action="gerenciar-turno" data-id="${c.id}">
@@ -2677,8 +2682,13 @@ $('btnCancelGerenciar').onclick = () => $('modalGerenciar').classList.remove('op
 $('btnAdicionarDoGerenciar').onclick = () => { $('modalGerenciar').classList.remove('open'); abrirFormNovo(); };
 $('gerenciarBusca').oninput = renderGerenciarLista;
 $('gerenciarLista').addEventListener('change', (e) => {
-  const input = e.target.closest('[data-action="gerenciar-area"], [data-action="gerenciar-setor"], [data-action="gerenciar-turno"]');
+  const input = e.target.closest('[data-action="gerenciar-basedata"], [data-action="gerenciar-area"], [data-action="gerenciar-setor"], [data-action="gerenciar-turno"]');
   if(!input) return;
+  if(input.dataset.action === 'gerenciar-basedata'){
+    if(!input.value){ toast('Data-base não pode ficar vazia'); renderGerenciarLista(); return; }
+    atualizarCampoGerenciar(input.dataset.id, 'baseData', input.value);
+    return;
+  }
   const campo = input.dataset.action === 'gerenciar-area' ? 'area' : (input.dataset.action === 'gerenciar-setor' ? 'setor' : 'turno');
   atualizarCampoGerenciar(input.dataset.id, campo, input.value);
 });
