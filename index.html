@@ -2364,8 +2364,10 @@ async function exportarPDF(){
 
   // Monta as linhas já separadas por categoria — os números do KPI, no topo,
   // são sempre o .length dessas MESMAS listas usadas nas tabelas abaixo, então
-  // nunca ficam incoerentes com o que aparece na página.
-  const aprovadas = [], aguardando = [], semStatus = [], jaGozadas = [];
+  // nunca ficam incoerentes com o que aparece na página. Períodos já fechados
+  // (histórico) ficam de fora de propósito — este relatório é um retrato do
+  // momento atual, não um histórico (isso já existe na exportação em Excel).
+  const aprovadas = [], aguardando = [], semStatus = [];
 
   colaboradores.forEach(c => {
     const st = calcularStatus(c);
@@ -2374,17 +2376,11 @@ async function exportarPDF(){
     (c.lancamentos || []).forEach(l => {
       const inicio = parseISO(l.dataPrevista);
       const retorno = addDays(inicio, l.dias);
-      const tipo = retorno <= hojeRef ? 'Já gozado (aguard. encerramento)' : (inicio <= hojeRef ? 'Em curso' : 'Planejado');
+      const tipo = retorno <= hojeRef ? 'Já gozado (aguard. encerramento)' : (inicio <= hojeRef ? 'Em curso' : 'Agendado');
       const linha = [c.nome, `${fmtDias(l.dias)}d`, fmtData(inicio), tipo, situacao, c.turno || '—'];
       if(l.status === 'aprovada') aprovadas.push(linha);
       else if(l.status === 'aguardando') aguardando.push(linha);
       else semStatus.push(linha);
-    });
-
-    (c.historico || []).forEach(h => {
-      (h.lancamentos || []).forEach(l => {
-        jaGozadas.push([c.nome, `${fmtDias(l.dias)}d`, fmtData(parseISO(l.dataPrevista)), fmtData(parseISO(h.dataConclusao)), c.turno || '—']);
-      });
     });
   });
 
@@ -2433,13 +2429,12 @@ async function exportarPDF(){
   }
 
   const cabecalhoParcela = ['Nome', 'Dias', 'Data início', 'Tipo', 'Situação do período', 'Turno'];
-  tabelaCategoria('✅ Aprovadas', [26, 138, 74], aprovadas, cabecalhoParcela);
-  tabelaCategoria('🕓 Aguardando RH', [77, 158, 255], aguardando, cabecalhoParcela);
-  tabelaCategoria('⚠️ Sem status', [244, 196, 48], semStatus, cabecalhoParcela);
-  tabelaCategoria('📁 Já gozado (histórico)', [130, 130, 130], jaGozadas, ['Nome', 'Dias', 'Data da parcela', 'Encerrado em', 'Turno']);
+  tabelaCategoria('Aprovadas', [26, 138, 74], aprovadas, cabecalhoParcela);
+  tabelaCategoria('Aguardando RH', [77, 158, 255], aguardando, cabecalhoParcela);
+  tabelaCategoria('Sem status', [244, 196, 48], semStatus, cabecalhoParcela);
 
   doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(200, 60, 60);
-  doc.text(`⏳ Em alerta — 2º período próximo de também vencer (${linhasAlerta.length})`, 30, y);
+  doc.text(`Em alerta — 2º período próximo de também vencer (${linhasAlerta.length})`, 30, y);
   doc.setTextColor(0);
   doc.autoTable({
     startY: y + 8,
