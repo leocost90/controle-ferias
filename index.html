@@ -526,6 +526,16 @@
       <input type="date" id="lancarDataPrevista">
     </div>
     <div class="field">
+      <label>Calendário de cobertura — toque num dia pra usar como data</label>
+      <div class="cal-header">
+        <button class="cal-nav" id="calMesAnteriorLancar" type="button">‹</button>
+        <span class="cal-titulo" id="calTituloLancar">Mês</span>
+        <button class="cal-nav" id="calMesSeguinteLancar" type="button">›</button>
+      </div>
+      <div class="cal-grid" id="calGradeDiasLancar"></div>
+      <div id="calDetalheLancar"></div>
+    </div>
+    <div class="field">
       <label>Status de aprovação (opcional)</label>
       <div class="aprov-actions" id="lancarAprovacaoBtns">
         <button type="button" class="aprov-btn" data-valor="aguardando">🕓 Aguardando RH</button>
@@ -1666,8 +1676,9 @@ function renderPizza(svgId, percentual, corHex){
   `;
 }
 
-// ---------- Calendário de cobertura ----------
-let calAnoAtual, calMesAtual; // mês: 0-11
+// ---------- Calendário de cobertura (reutilizável em mais de um lugar) ----------
+let calAnoAtual, calMesAtual; // calendário do Dashboard
+let calLancarAno, calLancarMes; // calendário dentro do "Lançar férias"
 
 function pessoasDeFeriasNoDia(dia){
   const nomes = [];
@@ -1689,12 +1700,12 @@ function pessoasDeFeriasNoDia(dia){
   return [...new Set(nomes)];
 }
 
-function renderCalendario(){
-  const primeiroDia = new Date(calAnoAtual, calMesAtual, 1);
-  const ultimoDia = new Date(calAnoAtual, calMesAtual + 1, 0);
+function renderCalendarioEm(ano, mes, ids){
+  const primeiroDia = new Date(ano, mes, 1);
+  const ultimoDia = new Date(ano, mes + 1, 0);
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  $('calTitulo').textContent = `${nomesMes[calMesAtual]} de ${calAnoAtual}`;
+  $(ids.titulo).textContent = `${nomesMes[mes]} de ${ano}`;
 
   const totalColab = colaboradores.length || 1;
   const offsetInicio = primeiroDia.getDay(); // 0=domingo
@@ -1705,7 +1716,7 @@ function renderCalendario(){
   for(let i = 0; i < offsetInicio; i++) html += `<div class="cal-dia vazio"></div>`;
 
   for(let dia = 1; dia <= diasNoMes; dia++){
-    const dataDia = new Date(calAnoAtual, calMesAtual, dia);
+    const dataDia = new Date(ano, mes, dia);
     const nomes = pessoasDeFeriasNoDia(dataDia);
     const qtd = nomes.length;
     const pct = qtd / totalColab;
@@ -1714,14 +1725,19 @@ function renderCalendario(){
       nivel = pct >= 0.2 ? 'nivel-alto' : (pct >= 0.08 ? 'nivel-medio' : 'nivel-baixo');
     }
     const isHoje = dataDia.getTime() === hoje.getTime();
-    html += `<div class="cal-dia ${qtd > 0 ? 'tem-gente' : ''} ${nivel} ${isHoje ? 'hoje' : ''}" ${qtd > 0 ? `data-action="cal-dia" data-data="${dataDia.toISOString().slice(0,10)}"` : ''}>
+    const isoData = dataDia.toISOString().slice(0,10);
+    html += `<div class="cal-dia tem-gente ${nivel} ${isHoje ? 'hoje' : ''}" data-action="${ids.acaoDia}" data-data="${isoData}">
       <span class="cal-num">${dia}</span>
       ${qtd > 0 ? `<span class="cal-badge">${qtd}</span>` : ''}
     </div>`;
   }
 
-  $('calGradeDias').innerHTML = html;
-  $('calDetalheDia').innerHTML = '';
+  $(ids.grade).innerHTML = html;
+  if(ids.detalhe) $(ids.detalhe).innerHTML = '';
+}
+
+function renderCalendario(){
+  renderCalendarioEm(calAnoAtual, calMesAtual, { titulo:'calTitulo', grade:'calGradeDias', detalhe:'calDetalheDia', acaoDia:'cal-dia' });
 }
 
 function mostrarDetalheDia(dataISO){
@@ -1733,6 +1749,23 @@ function mostrarDetalheDia(dataISO){
         <div class="pizza-nomes" style="max-height:160px;">
           ${nomes.map(n => `<div class="pizza-nome-linha"><span>${escapeHtml(n)}</span></div>`).join('')}
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCalendarioLancar(){
+  renderCalendarioEm(calLancarAno, calLancarMes, { titulo:'calTituloLancar', grade:'calGradeDiasLancar', detalhe:null, acaoDia:'cal-dia-lancar' });
+}
+
+function selecionarDiaNoLancar(dataISO){
+  $('lancarDataPrevista').value = dataISO;
+  const nomes = pessoasDeFeriasNoDia(parseISO(dataISO));
+  $('calDetalheLancar').innerHTML = `
+    <div class="pizza-linha" style="margin-top:8px;">
+      <div class="pizza-detalhes">
+        <div class="pizza-titulo">${fmtData(parseISO(dataISO))} — ${nomes.length} já de férias nesse dia</div>
+        ${nomes.length ? `<div class="pizza-nomes" style="max-height:110px;">${nomes.map(n => `<div class="pizza-nome-linha"><span>${escapeHtml(n)}</span></div>`).join('')}</div>` : '<div class="dash-empty">Data selecionada. Ninguém mais de férias nesse dia.</div>'}
       </div>
     </div>
   `;
@@ -1931,6 +1964,11 @@ function abrirLancar(id){
   $('lancarErro').classList.remove('show');
   $('lancarStatusEscolhido').value = '';
   atualizarBotoesAprovacaoLancar();
+  $('calDetalheLancar').innerHTML = '';
+  const hoje = new Date();
+  calLancarAno = hoje.getFullYear();
+  calLancarMes = hoje.getMonth();
+  renderCalendarioLancar();
   $('modalLancar').classList.add('open');
 }
 
@@ -2708,6 +2746,16 @@ $('calMesSeguinte').onclick = () => {
   if(calMesAtual > 11){ calMesAtual = 0; calAnoAtual++; }
   renderCalendario();
 };
+$('calMesAnteriorLancar').onclick = () => {
+  calLancarMes--;
+  if(calLancarMes < 0){ calLancarMes = 11; calLancarAno--; }
+  renderCalendarioLancar();
+};
+$('calMesSeguinteLancar').onclick = () => {
+  calLancarMes++;
+  if(calLancarMes > 11){ calLancarMes = 0; calLancarAno++; }
+  renderCalendarioLancar();
+};
 $('btnCancelDashExpandido').onclick = () => $('modalDashExpandido').classList.remove('open');
 document.querySelectorAll('.dash-mini-chip[data-tab], .pizza-card[data-tab]').forEach(el => {
   el.addEventListener('click', () => abrirDashExpandido(el.dataset.tab));
@@ -2770,6 +2818,7 @@ document.body.addEventListener('click', (e) => {
   else if(action === 'dash-aprovar') dashAprovar(id, btn.dataset.parcela);
   else if(action === 'dash-reprovar') dashReprovar(id, btn.dataset.parcela);
   else if(action === 'cal-dia') mostrarDetalheDia(btn.dataset.data);
+  else if(action === 'cal-dia-lancar') selecionarDiaNoLancar(btn.dataset.data);
 });
 
 // ---------- Autenticação (anônima e automática — sem tela de login) ----------
