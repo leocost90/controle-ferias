@@ -626,6 +626,16 @@
 
     <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
       <div class="helptext" style="margin-bottom:8px;">
+        Migrar para outro Firebase (ex.: conta de um colega) sem perder nada — backup 100% fiel,
+        incluindo id, status de cada parcela e histórico completo (o Excel não guarda tudo isso).
+      </div>
+      <button class="btn btn-ghost" id="btnExportarBackup" style="width:100%; margin-bottom:8px;">💾 Exportar backup completo (.json)</button>
+      <button class="btn btn-ghost" id="btnImportarBackup" style="width:100%;">📥 Importar backup completo (.json)</button>
+      <input type="file" id="inputImportarBackup" accept=".json" style="display:none;">
+    </div>
+
+    <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
+      <div class="helptext" style="margin-bottom:8px;">
         Limpeza de histórico — mantém só os períodos encerrados mais recentes de cada colaborador,
         reduzindo o tamanho dos registros conforme o uso vai acumulando ao longo do tempo. Não afeta o período em aberto atual.
       </div>
@@ -996,7 +1006,7 @@ function fmtDias(n){ return (Math.round(n*10)/10).toString().replace('.0',''); }
 // Dados da planilha de referência (jan/2025) enviada pelo usuário — aplicados
 // automaticamente uma única vez, mesclando com o que já existir (sem duplicar nomes).
 const SEED_KEY = 'ferias:seedAplicado';
-const SEED_INICIAL = [{"nome": "REGIS EDUARDO GONCALVES", "baseData": "2024-03-13", "usado": 18}, {"nome": "DOUGLAS RICARDO PEDROSO", "baseData": "2024-04-06", "usado": 18}, {"nome": "LUCAS MOREIRA FABIANO", "baseData": "2024-04-22", "usado": 18}, {"nome": "LUIZ CARLOS DA SILVA", "baseData": "2024-04-24", "usado": 21}, {"nome": "BRUNO SILVA ANDRADE", "baseData": "2024-05-03", "usado": 18}, {"nome": "NILTON JUNIOR BENTO", "baseData": "2024-05-03", "usado": 18}, {"nome": "EMERSON JOSE DOS SANTOS", "baseData": "2024-05-03", "usado": 10}, {"nome": "PEDRO VINICIUS EMBOAVA", "baseData": "2024-06-01", "usado": 18}, {"nome": "ACASSIO RIBEIRO AUGUSTO", "baseData": "2024-07-10", "usado": 11}, {"nome": "DIOGO JONATHAN DA SILVA", "baseData": "2024-08-21", "usado": 14}, {"nome": "LEONARDO COSTA DOS SANTOS", "baseData": "2024-08-27", "usado": 0}, {"nome": "ANDRE LUIZ DE ALMEIDA RAIMUNDO", "baseData": "2024-10-02", "usado": 18}, {"nome": "ARILSON TADEU DE OLIVEIRA", "baseData": "2024-10-13", "usado": 18}, {"nome": "FAGNER ALVES PEREIRA", "baseData": "2024-10-03", "usado": 18}, {"nome": "EDER LUIZ DA SILVA", "baseData": "2024-10-17", "usado": 18}, {"nome": "OSMILER TORRES", "baseData": "2024-10-17", "usado": 18}, {"nome": "DANIEL FABIANO DE OLIVEIRA", "baseData": "2024-11-01", "usado": 18}, {"nome": "RODRIGO ANDRADE DA FONSECA", "baseData": "2024-12-01", "usado": 18}, {"nome": "ALYSON MARTINS MORGADO", "baseData": "2024-12-02", "usado": 18}, {"nome": "RODRIGO FERNANDES LEMES", "baseData": "2024-12-06", "usado": 18}, {"nome": "GILBERTO LUIZ SILVA DE PAULA", "baseData": "2024-12-11", "usado": 18}, {"nome": "GILSON DE ANDRADE REZENDE NETO", "baseData": "2024-12-12", "usado": 18}, {"nome": "ANDRE LUIZ BERNARDINO", "baseData": "2025-01-06", "usado": 14}, {"nome": "ANDERSON CAMPOS ALMEIDA SANTOS", "baseData": "2025-01-09", "usado": 18}, {"nome": "WILLIAM DE OLIVEIRA SILVA", "baseData": "2025-02-01", "usado": 0}, {"nome": "REGIS SADAO MACIEL TAKAYAMA", "baseData": "2025-02-01", "usado": 18.0}, {"nome": "ALACIR SILVESTRE DE FARIA", "baseData": "2025-02-25", "usado": 18.0}, {"nome": "NATANA CRISTINA DOS SANTOS", "baseData": "2025-03-13", "usado": 14}, {"nome": "HENRIQUE ALVES DOS SANTOS", "baseData": "2025-03-14", "usado": 14}, {"nome": "ADRIANO SANTOS", "baseData": "2025-04-01", "usado": 0}, {"nome": "BRUNO RODRIGO RIBAS", "baseData": "2025-04-06", "usado": 18.0}, {"nome": "VICTOR DA SILVA ESTEVAO", "baseData": "2025-04-22", "usado": 0}, {"nome": "BRUNO DINIZ TAVARES", "baseData": "2025-05-03", "usado": 18}, {"nome": "ALINE CRISTINA DE ANDRADE RODRIGUES", "baseData": "2025-10-06", "usado": 0}];
+const SEED_INICIAL = [{"id":"cseed88ij524","nome":"REGIS EDUARDO GONCALVES","baseData":"2024-03-13","periodosFechados":1,"area":"Recebimento","setor":"Almoxarifado Componentes","turno":"2X2X3 A2","lancamentos":[{"id":"lseed108wpe0","dias":30,"data":"2026-11-16","dataPrevista":"2026-11-16","status":"aguardando"}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed56ljfq4","dias":18,"dataPrevista":"2024-03-13","status":null},{"id":"lseed57io3vr","dias":12,"dataPrevista":"2026-02-16","status":null}]}]},{"id":"cseed77ouq3n","nome":"DOUGLAS RICARDO PEDROSO","baseData":"2024-04-06","periodosFechados":1,"area":"Nave Central","setor":"Empilhadeira Solda","turno":"2X2X3 A2","lancamentos":[{"id":"lseed6j1x80","dias":12,"data":"2026-11-04","dataPrevista":"2026-11-04","status":null}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed34r1jec","dias":18,"dataPrevista":"2024-04-06","status":null},{"id":"lseed351wzg1","dias":12,"dataPrevista":"2026-02-23","status":null}]}]},{"id":"cseed83y8tw7","nome":"LUCAS MOREIRA FABIANO","baseData":"2024-04-22","periodosFechados":1,"area":"Nave Central","setor":"Carregamento Pátio","turno":"2X2X3 A2","lancamentos":[{"id":"lseed7mhsfa","dias":20,"data":"2026-11-16","dataPrevista":"2026-11-16","status":null}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed463cb97","dias":18,"dataPrevista":"2024-04-22","status":null},{"id":"lseed479zrpy","dias":12,"dataPrevista":"2026-03-08","status":null}]}]},{"id":"cseed849kyat","nome":"LUIZ CARLOS DA SILVA","baseData":"2024-04-24","periodosFechados":1,"area":"Nave Oeste","setor":"Porta Pallets","turno":"2X2X3 A2","lancamentos":[{"id":"lseed810z39","dias":10,"data":"2026-10-28","dataPrevista":"2026-10-28","status":"aguardando"},{"id":"lseed96qmjs","dias":20,"data":"2026-12-14","dataPrevista":"2026-12-14","status":null}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed4850i65","dias":21,"dataPrevista":"2024-04-24","status":null},{"id":"lseed49qda9d","dias":9,"dataPrevista":"2026-03-09","status":null}]}]},{"id":"cseed74rkao4","nome":"BRUNO SILVA ANDRADE","baseData":"2024-05-03","periodosFechados":1,"area":"Nave Central","setor":"Empilhadeira blocado","turno":"3ºTURNO","lancamentos":[{"id":"lseed5yr1qb","dias":20,"data":"2026-10-26","dataPrevista":"2026-10-26","status":null}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed288l8jb","dias":18,"dataPrevista":"2024-05-03","status":null},{"id":"lseed295g0md","dias":12,"dataPrevista":"2026-04-12","status":null}]}]},{"id":"cseed870lzq9","nome":"PEDRO VINICIUS EMBOAVA","baseData":"2024-06-01","periodosFechados":1,"area":"Nave Central","setor":"Descarregamento Pátio (Patolao)","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed544d1uw","dias":18,"dataPrevista":"2024-06-01","status":null},{"id":"lseed55qhhxn","dias":12,"dataPrevista":"2026-03-02","status":null}]}]},{"id":"cseed64n2tgn","nome":"ACASSIO RIBEIRO AUGUSTO","baseData":"2024-07-10","periodosFechados":1,"area":"Nave Central","setor":"Líder","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed16xvbxa","dias":11,"dataPrevista":"2024-07-10","status":null},{"id":"lseed17r6sq0","dias":19,"dataPrevista":"2026-04-06","status":null}]}]},{"id":"cseed76muh75","nome":"DIOGO JONATHAN DA SILVA","baseData":"2024-08-21","periodosFechados":1,"area":"Expedição","setor":"Líder","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed32eybea","dias":14,"dataPrevista":"2024-08-21","status":null},{"id":"lseed33v1pl0","dias":16,"dataPrevista":"2026-05-04","status":null}]}]},{"id":"cseed70kdj01","nome":"ANDRE LUIZ DE ALMEIDA RAIMUNDO","baseData":"2024-10-02","periodosFechados":1,"area":"Hotstamping","setor":"Abastecimento KIT MQB","turno":"3ºTURNO","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed24tk5tw","dias":18,"dataPrevista":"2024-10-02","status":null},{"id":"lseed25ek75e","dias":12,"dataPrevista":"2026-06-08","status":null}]}]},{"id":"cseed79gn87x","nome":"FAGNER ALVES PEREIRA","baseData":"2024-10-03","periodosFechados":1,"area":"Honda/Toyota","setor":"Expedição","turno":"3ºTURNO","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed38lmwn3","dias":18,"dataPrevista":"2024-10-03","status":null},{"id":"lseed391bdkb","dias":12,"dataPrevista":"2026-05-04","status":null}]}]},{"id":"cseed712p7q0","nome":"ARILSON TADEU DE OLIVEIRA","baseData":"2024-10-13","periodosFechados":1,"area":"Nave Central","setor":"Rebocador MQB","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed26znq9x","dias":18,"dataPrevista":"2024-10-13","status":null},{"id":"lseed27abl3i","dias":12,"dataPrevista":"2026-06-19","status":null}]}]},{"id":"cseed78xflx5","nome":"EDER LUIZ DA SILVA","baseData":"2024-10-17","periodosFechados":1,"area":"Hotstamping","setor":"Expedição","turno":"3ºTURNO","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed36ihpa4","dias":18,"dataPrevista":"2024-10-17","status":null},{"id":"lseed37uosx6","dias":12,"dataPrevista":"2026-05-18","status":null}]}]},{"id":"cseed8675j2s","nome":"OSMILER TORRES","baseData":"2024-10-17","periodosFechados":1,"area":"Nave Central","setor":"Empilhadeira Estamparia","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed52idx3i","dias":18,"dataPrevista":"2024-10-17","status":null},{"id":"lseed536231j","dias":12,"dataPrevista":"2026-05-27","status":null}]}]},{"id":"cseed753llv1","nome":"DANIEL FABIANO DE OLIVEIRA","baseData":"2024-11-01","periodosFechados":1,"area":"Nave Oeste","setor":"Rebocador MQB/ KIT","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed30unq3h","dias":18,"dataPrevista":"2024-11-01","status":null},{"id":"lseed31q05hu","dias":12,"dataPrevista":"2026-07-03","status":null}]}]},{"id":"cseed9013mzk","nome":"RODRIGO ANDRADE DA FONSECA","baseData":"2024-12-01","periodosFechados":1,"area":"Expedição","setor":"Descarregamento Rebocador (Faixa Laranja)","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed605uiy1","dias":18,"dataPrevista":"2024-12-01","status":null},{"id":"lseed619vylh","dias":12,"dataPrevista":"2026-07-17","status":null}]}]},{"id":"cseed68ncvwr","nome":"ALYSON MARTINS MORGADO","baseData":"2024-12-02","periodosFechados":1,"area":"Nave Central","setor":"Empilhadeira Estamparia","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed20yakrx","dias":18,"dataPrevista":"2024-12-02","status":null},{"id":"lseed214uolg","dias":12,"dataPrevista":"2026-07-31","status":null}]}]},{"id":"cseed91wqfs0","nome":"RODRIGO FERNANDES LEMES","baseData":"2024-12-06","periodosFechados":1,"area":"Nave Oeste","setor":"Empilhadeira Pintura","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed62qkhop","dias":18,"dataPrevista":"2024-12-06","status":null},{"id":"lseed631nyof","dias":12,"dataPrevista":"2026-08-14","status":null}]}]},{"id":"cseed801au7d","nome":"GILBERTO LUIZ SILVA DE PAULA","baseData":"2024-12-11","periodosFechados":1,"area":"Hotstamping","setor":"Empilhadeira Lasers/Prensa","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed40p0y6k","dias":18,"dataPrevista":"2024-12-11","status":null},{"id":"lseed41w9o0p","dias":12,"dataPrevista":"2026-07-31","status":null}]}]},{"id":"cseed810svmp","nome":"GILSON DE ANDRADE REZENDE NETO","baseData":"2024-12-12","periodosFechados":1,"area":"Nave Central","setor":"Expedição","turno":"3ºTURNO","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed42qwkfy","dias":18,"dataPrevista":"2024-12-12","status":null},{"id":"lseed43vyb9z","dias":12,"dataPrevista":"2026-06-08","status":null}]}]},{"id":"cseed94icpwn","nome":"ANDRE LUIZ BERNARDINO","baseData":"2025-01-06","periodosFechados":0,"area":"Recebimento","setor":"Almoxarifado MP","turno":"2X2X3 B2","lancamentos":[{"id":"lseed14hyjjg","dias":14,"data":"2025-01-06","dataPrevista":"2025-01-06","status":"aprovada"},{"id":"lseed15cpawd","dias":16,"data":"2026-10-26","dataPrevista":"2026-10-26","status":"aguardando"}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]},{"id":"cseed692y6g4","nome":"ANDERSON CAMPOS ALMEIDA SANTOS","baseData":"2025-01-09","periodosFechados":1,"area":"Hotstamping","setor":"Empilhadeira Solda MQB","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-01","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed22awmtg","dias":18,"dataPrevista":"2025-01-09","status":null},{"id":"lseed23ff4t2","dias":12,"dataPrevista":"2026-08-14","status":null}]}]},{"id":"cseed89my0l8","nome":"REGIS SADAO MACIEL TAKAYAMA","baseData":"2025-02-01","periodosFechados":1,"area":"Nave Central","setor":"Empilhadeira Estamparia","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-02","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed580u64i","dias":18,"dataPrevista":"2025-02-01","status":null},{"id":"lseed59nommc","dias":12,"dataPrevista":"2026-09-02","status":null}]}]},{"id":"cseed93qhoj2","nome":"WILLIAM DE OLIVEIRA SILVA","baseData":"2025-02-01","periodosFechados":0,"area":"Recebimento","setor":"Almoxarifado Componentes","turno":"3ºTURNO","lancamentos":[{"id":"lseed12rqplb","dias":10,"data":"2026-07-20","dataPrevista":"2026-07-20","status":"aprovada"},{"id":"lseed13qf951","dias":20,"data":"2026-10-05","dataPrevista":"2026-10-05","status":"aguardando"}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]},{"id":"cseed66ijjmv","nome":"ALACIR SILVESTRE DE FARIA","baseData":"2025-02-25","periodosFechados":1,"area":"Nave Oeste","setor":"Empilhadeira Quadro MQB","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-02","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed184vzwh","dias":18,"dataPrevista":"2025-02-25","status":null},{"id":"lseed199w5h4","dias":12,"dataPrevista":"2026-09-02","status":null}]}]},{"id":"cseed85qgwyi","nome":"NATANA CRISTINA DOS SANTOS","baseData":"2025-03-13","periodosFechados":1,"area":"Nave Central","setor":"Rebocador MQB","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-09","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed508sjqm","dias":14,"dataPrevista":"2025-03-13","status":null},{"id":"lseed51fc4i8","dias":16,"dataPrevista":"2026-09-21","status":null}]}]},{"id":"cseed8297hjs","nome":"HENRIQUE ALVES DOS SANTOS","baseData":"2025-03-14","periodosFechados":1,"area":"Recebimento","setor":"Almoxarifado MP","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[{"dataConclusao":"2026-09-12","diasDireito":30,"diasGozados":30,"parcelas":2,"ciclosFechados":1,"lancamentos":[{"id":"lseed44w32rj","dias":14,"dataPrevista":"2025-03-14","status":null},{"id":"lseed456tl78","dias":16,"dataPrevista":"2026-09-30","status":null}]}]},{"id":"cseed65ma3il","nome":"ADRIANO SANTOS","baseData":"2025-04-01","periodosFechados":0,"area":"Nave Central","setor":"Expedição","turno":"3ºTURNO","lancamentos":[{"id":"lseed1pduol","dias":30,"data":"2026-12-21","dataPrevista":"2026-12-21","status":null}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]},{"id":"cseed735re79","nome":"BRUNO RODRIGO RIBAS","baseData":"2025-04-06","periodosFechados":0,"area":"Nave Central","setor":"Expedição","turno":"3ºTURNO","lancamentos":[{"id":"lseed3g6pn6","dias":18,"data":"2025-04-06","dataPrevista":"2025-04-06","status":"aprovada"},{"id":"lseed4o6svh","dias":12,"data":"2026-12-06","dataPrevista":"2026-12-06","status":null}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]},{"id":"cseed92etcrb","nome":"VICTOR DA SILVA ESTEVAO","baseData":"2025-04-22","periodosFechados":0,"area":"Nave Central","setor":"Rebocador MQB","turno":"2X2X3 A2","lancamentos":[{"id":"lseed11pkf4q","dias":16,"data":"2026-10-14","dataPrevista":"2026-10-14","status":"aguardando"}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]},{"id":"cseed72mzjro","nome":"BRUNO DINIZ TAVARES","baseData":"2025-05-03","periodosFechados":0,"area":"Nave Central","setor":"Líder","turno":"3ºTURNO","lancamentos":[{"id":"lseed2ssc7l","dias":18,"data":"2025-05-03","dataPrevista":"2025-05-03","status":"aprovada"}],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]},{"id":"cseed9576v4l","nome":"LEONARDO COSTA DOS SANTOS","baseData":"2025-08-27","periodosFechados":0,"area":"Logística","setor":"Supervisão","turno":"2X2X3 A2","lancamentos":[],"statusAprovacao":null,"obs":"","historico":[]},{"id":"cseed6763pvt","nome":"ALINE CRISTINA DE ANDRADE RODRIGUES","baseData":"2025-10-06","periodosFechados":0,"area":"Nave Central","setor":"Rebocador Honda/Toyota","turno":"3ºTURNO","lancamentos":[],"statusAprovacao":null,"obs":"Importado de planilha com saldo (dados de referência de set/2026)","historico":[]}];
 
 // ---------- Storage ----------
 function colaboradoresCollection(){ return dbInstance.collection('ferias-app-colaboradores'); }
@@ -1058,16 +1068,16 @@ async function aplicarSeedSeNecessario(){
 
   const nomesExistentes = new Set(colaboradores.map(c => c.nome.trim().toLowerCase()));
   const novos = [];
-  SEED_INICIAL.forEach((item, i) => {
+  SEED_INICIAL.forEach((item) => {
     const chave = item.nome.trim().toLowerCase();
     if(nomesExistentes.has(chave)) return; // já existe, não duplica
+    // O seed já vem no formato completo (mesma estrutura de um colaborador
+    // salvo de verdade) — só precisa de um id novo pra não colidir.
     const novo = {
+      ...item,
       id: gerarId('seed'),
-      nome: item.nome, baseData: item.baseData, periodosFechados: 0,
-      lancamentos: item.usado > 0 ? [{ id: gerarId('l'), dias: item.usado, data: item.baseData, dataPrevista: item.baseData, status: null }] : [],
-      statusAprovacao: null,
-      obs: 'Importado de planilha com saldo (dados de referência de jan/2025)',
-      historico: []
+      lancamentos: (item.lancamentos || []).map(l => ({ ...l, id: l.id || gerarId('l') })),
+      historico: (item.historico || []).map(h => ({ ...h, lancamentos: (h.lancamentos || []).map(l => ({ ...l, id: l.id || gerarId('l') })) }))
     };
     colaboradores.push(novo);
     novos.push(novo);
@@ -1230,7 +1240,7 @@ function render(){
       ? `<div class="parcelas-lista">${c.lancamentos.map(l => {
           const statusTxt = l.status === 'aguardando' ? '<span class="parcela-status aguardando">🕓 Aguardando RH</span>'
             : l.status === 'aprovada' ? '<span class="parcela-status aprovada">✅ Aprovada</span>'
-            : '<span class="parcela-status atencao">⚠️ Atenção — sem status</span>';
+            : '<span class="parcela-status atencao">⚠️ Aguardando agendamento WorkForce</span>';
           return `<div class="parcela-item">
             <span>${fmtDias(l.dias)}d (início ${fmtData(parseISO(l.dataPrevista))})</span>
             ${statusTxt}
@@ -1580,7 +1590,13 @@ function calcularListasDashboard(){
   colaboradores.forEach(c => {
     (c.lancamentos || []).forEach(l => {
       if(l.status === 'aguardando') aguardando.push({ colaborador: c, parcela: l });
-      if(l.status === 'aprovada') aprovadas.push({ colaborador: c, parcela: l });
+      // "Aprovadas" só mostra quem ainda vai sair (ou já está) de férias — uma
+      // parcela aprovada cuja data já passou por completo não conta mais aqui,
+      // senão fica cheio de "período antigo" que já aconteceu de verdade.
+      if(l.status === 'aprovada' && l.dataPrevista){
+        const retornoParcela = addDays(parseISO(l.dataPrevista), l.dias);
+        if(retornoParcela >= hoje) aprovadas.push({ colaborador: c, parcela: l });
+      }
     });
     // "Em férias" e "Próximas" só valem pra quem já foi aprovado pelo RH — e
     // olham tanto nas parcelas em aberto quanto nas de períodos já encerrados
@@ -2219,6 +2235,60 @@ async function limparHistorico(){
   toast(`Histórico reduzido em ${afetados.length} colaborador(es)`);
 }
 
+// ---------- Backup completo (JSON) — migração 100% fiel entre contas ----------
+async function exportarBackupCompleto(){
+  if(colaboradores.length === 0){ toast('Nenhum colaborador cadastrado para exportar.'); return; }
+  const backup = {
+    versao: 1,
+    geradoEm: new Date().toISOString(),
+    regras,
+    colaboradores
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const hoje = new Date();
+  await salvarArquivo(blob, `backup-ferias-${hoje.toISOString().slice(0,10)}.json`, {
+    desc: 'Backup completo (JSON)',
+    accept: { 'application/json': ['.json'] }
+  });
+  toast(`Backup gerado com ${colaboradores.length} colaborador(es) — guarde esse arquivo em local seguro`);
+}
+
+async function confirmarImportarBackup(file){
+  if(!file) return;
+  let dados;
+  try{
+    const texto = await file.text();
+    dados = JSON.parse(texto);
+  }catch(e){
+    toast('Não consegui ler esse arquivo — confirme que é um backup .json gerado por este app.');
+    return;
+  }
+  const listaColaboradores = Array.isArray(dados) ? dados : dados.colaboradores;
+  if(!Array.isArray(listaColaboradores)){
+    toast('Arquivo em formato inesperado — não achei a lista de colaboradores dentro dele.');
+    return;
+  }
+
+  const temDadosAtuais = colaboradores.length > 0;
+  const msg = temDadosAtuais
+    ? `Este app já tem ${colaboradores.length} colaborador(es) cadastrado(s). Importar esse backup vai SUBSTITUIR tudo pelos ${listaColaboradores.length} colaborador(es) do arquivo — os dados atuais daqui serão perdidos. Confirmar?`
+    : `Importar ${listaColaboradores.length} colaborador(es) desse backup?`;
+  const ok = await askConfirm(msg, 'Importar backup completo');
+  if(!ok) return;
+
+  colaboradores = listaColaboradores;
+  if(dados.regras) regras = { ...REGRAS_PADRAO, ...dados.regras };
+
+  // salva tudo de uma vez no armazenamento em uso (Firebase do colega, ou local)
+  await salvarVariosColaboradores(colaboradores);
+  try{ await storageSet(THRESHOLD_KEY, String(thresholdAmarelo), false); }catch(e){}
+  try{ await saveRegras(); }catch(e){}
+  try{ await storageSet(SEED_KEY, 'true', false); }catch(e){} // nunca mais aplica o seed de exemplo por cima disso
+
+  render();
+  toast(`Backup importado — ${colaboradores.length} colaborador(es) restaurado(s)`);
+}
+
 // ---------- Exportar histórico de férias (.xlsx) ----------
 // Tenta abrir a caixa "Salvar como" de verdade (Chrome/Edge/Android); se o
 // navegador não suportar (Safari/iOS, Firefox), cai no download padrão pra
@@ -2285,7 +2355,7 @@ async function exportarHistorico(){
           'Parcela nº': i + 1,
           'Dias da parcela': fmtDias(l.dias),
           'Data da parcela': l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : '',
-          'Status da parcela': l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'Sem status')
+          'Status da parcela': l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'Aguardando agendamento WorkForce')
         });
       });
     }
@@ -2378,7 +2448,11 @@ async function exportarPDF(){
       const retorno = addDays(inicio, l.dias);
       const tipo = retorno <= hojeRef ? 'Já gozado (aguard. encerramento)' : (inicio <= hojeRef ? 'Em curso' : 'Agendado');
       const linha = [c.nome, `${fmtDias(l.dias)}d`, fmtData(inicio), tipo, situacao, c.turno || '—'];
-      if(l.status === 'aprovada') aprovadas.push(linha);
+      // "Aprovadas" só lista quem ainda vai sair (ou já está) de férias — um
+      // período aprovado que já terminou de vez não entra mais aqui.
+      if(l.status === 'aprovada'){
+        if(tipo !== 'Já gozado (aguard. encerramento)') aprovadas.push(linha);
+      }
       else if(l.status === 'aguardando') aguardando.push(linha);
       else semStatus.push(linha);
     });
@@ -2398,7 +2472,7 @@ async function exportarPDF(){
   const totalProgramadas = aprovadas.length + aguardando.length + semStatus.length;
   const kpis = [
     ['Programadas (parcelas em aberto)', totalProgramadas], ['Aprovadas', aprovadas.length],
-    ['Aguardando RH', aguardando.length], ['Sem status', semStatus.length], ['Em alerta', alertas.length]
+    ['Aguardando RH', aguardando.length], ['Aguard. WorkForce', semStatus.length], ['Em alerta', alertas.length]
   ];
   let xKpi = 30;
   const larguraKpi = (largura - 60) / kpis.length;
@@ -2431,7 +2505,7 @@ async function exportarPDF(){
   const cabecalhoParcela = ['Nome', 'Dias', 'Data início', 'Tipo', 'Situação do período', 'Turno'];
   tabelaCategoria('Aprovadas', [26, 138, 74], aprovadas, cabecalhoParcela);
   tabelaCategoria('Aguardando RH', [77, 158, 255], aguardando, cabecalhoParcela);
-  tabelaCategoria('Sem status', [244, 196, 48], semStatus, cabecalhoParcela);
+  tabelaCategoria('Aguardando agendamento WorkForce', [244, 196, 48], semStatus, cabecalhoParcela);
 
   doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(200, 60, 60);
   doc.text(`Em alerta — 2º período próximo de também vencer (${linhasAlerta.length})`, 30, y);
@@ -2695,7 +2769,7 @@ async function confirmarImportExcel(){
       id: gerarId('c'),
       nome: grupo.nome, baseData, periodosFechados, turno: grupo.turno || '', area: grupo.area || '', setor: grupo.setor || '',
       lancamentos, statusAprovacao: null,
-      obs: 'Importado de planilha com saldo (dados de referência de jan/2025)',
+      obs: 'Importado de planilha com saldo (dados de referência de set/2026)',
       historico: []
     };
     colaboradores.push(novo);
@@ -2798,6 +2872,13 @@ $('gerenciarLista').addEventListener('change', (e) => {
   atualizarCampoGerenciar(input.dataset.id, campo, input.value);
 });
 $('btnExportar').onclick = exportarHistorico;
+$('btnExportarBackup').onclick = exportarBackupCompleto;
+$('btnImportarBackup').onclick = () => $('inputImportarBackup').click();
+$('inputImportarBackup').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  confirmarImportarBackup(file);
+  e.target.value = '';
+});
 $('btnExportarPDF').onclick = exportarPDF;
 $('btnLimparHistorico').onclick = limparHistorico;
 $('search').oninput = render;
