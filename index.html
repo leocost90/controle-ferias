@@ -2254,18 +2254,18 @@ async function exportarHistorico(){
   if(colaboradores.length === 0){ toast('Nenhum colaborador cadastrado para exportar.'); return; }
   const hoje = new Date();
 
-  // Aba 1: situação atual (uma linha por colaborador)
-  const resumo = colaboradores.map(c => {
+  // Aba 1: situação atual — uma linha por PARCELA em aberto (dias, data e status
+  // em colunas separadas). Colaborador sem nenhuma parcela lançada ainda ganha
+  // uma única linha com essas colunas em branco.
+  const resumo = [];
+  colaboradores.forEach(c => {
     const st = calcularStatus(c);
     const situacao = st.emAquisicao ? 'Em aquisição' : (st.cor === 'red' ? 'Vencido' : (st.cor === 'yellow' ? 'Atenção' : 'Em dia'));
-    const parcelasAtuais = (c.lancamentos || [])
-      .map(l => {
-        const statusTxt = l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'sem status');
-        return `${fmtDias(l.dias)}d (${l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : 's/ data'}, ${statusTxt})`;
-      })
-      .join('; ');
-    return {
+    const base = {
       'Nome': c.nome,
+      'Área': c.area || '',
+      'Setor': c.setor || '',
+      'Turno': c.turno || '',
       'Data-base': fmtData(parseISO(c.baseData)),
       'Situação': situacao,
       'Períodos vencidos em aberto': st.ciclosAbertos,
@@ -2273,38 +2273,67 @@ async function exportarHistorico(){
       'Direito acumulado / próx. período (dias)': st.emAquisicao ? fmtDias(st.diasAcumulados) : fmtDias(st.saldoProximo),
       'Vencimento do período mais antigo': fmtData(st.vencPeriodo),
       'Limite (prazo legal)': fmtData(st.limite),
-      'Parcelas em aberto (dias, data, status)': parcelasAtuais,
       'Observação': c.obs || ''
     };
+    const parcelas = c.lancamentos || [];
+    if(parcelas.length === 0){
+      resumo.push({ ...base, 'Parcela nº': '', 'Dias da parcela': '', 'Data da parcela': '', 'Status da parcela': '' });
+    } else {
+      parcelas.forEach((l, i) => {
+        resumo.push({
+          ...base,
+          'Parcela nº': i + 1,
+          'Dias da parcela': fmtDias(l.dias),
+          'Data da parcela': l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : '',
+          'Status da parcela': l.status === 'aguardando' ? 'Aguardando RH' : (l.status === 'aprovada' ? 'Aprovada' : 'Sem status')
+        });
+      });
+    }
   });
 
-  // Aba 2: histórico detalhado (uma linha por período já encerrado)
+  // Aba 2: histórico detalhado — uma linha por PARCELA de cada período já
+  // encerrado, mostrando o saldo usado acumulando conforme cada parcela foi
+  // sendo tirada, até fechar o total de dias de direito daquele período.
   const detalhado = [];
   colaboradores.forEach(c => {
     (c.historico || []).forEach(h => {
-      const parcelasTxt = (h.lancamentos || [])
-        .map(l => `${fmtDias(l.dias)}d (${l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : 's/ data'})`)
-        .join('; ');
-      detalhado.push({
-        'Nome': c.nome,
-        'Data de encerramento': fmtData(parseISO(h.dataConclusao)),
-        'Ciclos fechados': h.ciclosFechados || 1,
-        'Dias de direito': fmtDias(h.diasDireito),
-        'Dias usados': fmtDias(h.diasGozados),
-        'Parcelas': parcelasTxt || '(nenhuma — encerrado sem uso)'
+      const parcelas = h.lancamentos || [];
+      if(parcelas.length === 0){
+        detalhado.push({
+          'Nome': c.nome, 'Data de encerramento': fmtData(parseISO(h.dataConclusao)),
+          'Ciclos fechados': h.ciclosFechados || 1, 'Dias de direito do período': fmtDias(h.diasDireito),
+          'Parcela nº': '', 'Dias da parcela': '', 'Data da parcela': '',
+          'Dias usados acumulados': 0, 'Dias de direito': fmtDias(h.diasDireito)
+        });
+        return;
+      }
+      let acumulado = 0;
+      parcelas.forEach((l, i) => {
+        acumulado += l.dias;
+        detalhado.push({
+          'Nome': c.nome,
+          'Data de encerramento': fmtData(parseISO(h.dataConclusao)),
+          'Ciclos fechados': h.ciclosFechados || 1,
+          'Dias de direito do período': fmtDias(h.diasDireito),
+          'Parcela nº': i + 1,
+          'Dias da parcela': fmtDias(l.dias),
+          'Data da parcela': l.dataPrevista ? fmtData(parseISO(l.dataPrevista)) : '',
+          'Dias usados acumulados': fmtDias(acumulado),
+          'Dias de direito': fmtDias(h.diasDireito)
+        });
       });
     });
   });
 
   const wb = XLSX.utils.book_new();
   const wsResumo = XLSX.utils.json_to_sheet(resumo);
-  wsResumo['!cols'] = [{wch:28},{wch:12},{wch:12},{wch:10},{wch:10},{wch:14},{wch:14},{wch:14},{wch:45},{wch:20}];
+  wsResumo['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:10},{wch:12},{wch:12},{wch:10},{wch:10},{wch:14},{wch:14},{wch:14},{wch:20},{wch:10},{wch:12},{wch:12},{wch:16}];
   XLSX.utils.book_append_sheet(wb, wsResumo, 'Situação Atual');
 
   let wsDetalhado;
   if(detalhado.length){
     wsDetalhado = XLSX.utils.json_to_sheet(detalhado);
-    wsDetalhado['!cols'] = [{wch:28},{wch:16},{wch:12},{wch:12},{wch:12},{wch:40}];
+    wsDetalhado['!cols'] = [{wch:28},{wch:16},{wch:12},{wch:16},{wch:10},{wch:12},{wch:12},{wch:16},{wch:14}];
   } else {
     wsDetalhado = XLSX.utils.aoa_to_sheet([
       ['Nenhum período foi encerrado ainda.'],
@@ -2330,48 +2359,36 @@ async function exportarPDF(){
   if(typeof window.jspdf === 'undefined'){ toast('Não consegui carregar o gerador de PDF — confira sua conexão e tente de novo.'); return; }
   const { jsPDF } = window.jspdf;
   const hoje = new Date();
-  const m = calcularMetricasPizza();
   const alertas = calcularAlertas();
   const hojeRef = new Date(); hojeRef.setHours(0,0,0,0);
 
-  // Monta uma linha por PARCELA (não por colaborador), separando claramente
-  // o que já foi gozado do que ainda está planejado/em aberto.
-  const linhasParcelas = [];
+  // Monta as linhas já separadas por categoria — os números do KPI, no topo,
+  // são sempre o .length dessas MESMAS listas usadas nas tabelas abaixo, então
+  // nunca ficam incoerentes com o que aparece na página.
+  const aprovadas = [], aguardando = [], semStatus = [], jaGozadas = [];
+
   colaboradores.forEach(c => {
     const st = calcularStatus(c);
     const situacao = st.emAquisicao ? 'Em aquisição' : (st.cor === 'red' ? 'Vencido' : (st.cor === 'yellow' ? 'Atenção' : 'Em dia'));
 
-    // Parcelas já gozadas (vindas de períodos encerrados no histórico)
-    (c.historico || []).forEach(h => {
-      (h.lancamentos || []).forEach(l => {
-        linhasParcelas.push([
-          c.nome, 'Já gozado', `${fmtDias(l.dias)}d`, fmtData(parseISO(l.dataPrevista)),
-          l.status === 'aprovada' ? 'Aprovada' : (l.status === 'aguardando' ? 'Aguardando RH' : '—'),
-          situacao, c.turno || '—'
-        ]);
-      });
-    });
-
-    // Parcelas em aberto: separa se já está em curso, planejada (futura) ou já
-    // passou a data mas ainda não foi formalmente encerrada.
     (c.lancamentos || []).forEach(l => {
       const inicio = parseISO(l.dataPrevista);
       const retorno = addDays(inicio, l.dias);
       const tipo = retorno <= hojeRef ? 'Já gozado (aguard. encerramento)' : (inicio <= hojeRef ? 'Em curso' : 'Planejado');
-      linhasParcelas.push([
-        c.nome, tipo, `${fmtDias(l.dias)}d`, fmtData(inicio),
-        l.status === 'aprovada' ? 'Aprovada' : (l.status === 'aguardando' ? 'Aguardando RH' : 'Sem status'),
-        situacao, c.turno || '—'
-      ]);
+      const linha = [c.nome, `${fmtDias(l.dias)}d`, fmtData(inicio), tipo, situacao, c.turno || '—'];
+      if(l.status === 'aprovada') aprovadas.push(linha);
+      else if(l.status === 'aguardando') aguardando.push(linha);
+      else semStatus.push(linha);
     });
 
-    // Colaborador sem nenhuma parcela lançada (nem histórico, nem em aberto)
-    if((c.historico || []).length === 0 && (c.lancamentos || []).length === 0){
-      linhasParcelas.push([c.nome, '—', '—', '—', '—', situacao, c.turno || '—']);
-    }
+    (c.historico || []).forEach(h => {
+      (h.lancamentos || []).forEach(l => {
+        jaGozadas.push([c.nome, `${fmtDias(l.dias)}d`, fmtData(parseISO(l.dataPrevista)), fmtData(parseISO(h.dataConclusao)), c.turno || '—']);
+      });
+    });
   });
 
-  const linhasAlerta = alertas.map(a => [escapeHtmlPdf(a.colaborador.nome), fmtData(a.proxVencimento), `${a.dias}d`]);
+  const linhasAlerta = alertas.map(a => [a.colaborador.nome, fmtData(a.proxVencimento), `${a.dias}d`]);
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const largura = doc.internal.pageSize.getWidth();
@@ -2382,9 +2399,10 @@ async function exportarPDF(){
   doc.text(`Gerado em ${fmtData(hoje)} às ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} · ${colaboradores.length} colaborador(es)`, 30, 46);
   doc.setTextColor(0);
 
+  const totalProgramadas = aprovadas.length + aguardando.length + semStatus.length;
   const kpis = [
-    ['Em férias', m.emFeriasCount], ['Programadas', m.totalProgramadas],
-    ['Aguardando RH', m.aguardandoCount], ['Aprovadas', m.aprovadaCount], ['Em alerta', m.alertaCount]
+    ['Programadas (parcelas em aberto)', totalProgramadas], ['Aprovadas', aprovadas.length],
+    ['Aguardando RH', aguardando.length], ['Sem status', semStatus.length], ['Em alerta', alertas.length]
   ];
   let xKpi = 30;
   const larguraKpi = (largura - 60) / kpis.length;
@@ -2397,28 +2415,34 @@ async function exportarPDF(){
     xKpi += larguraKpi;
   });
 
-  doc.autoTable({
-    startY: 112,
-    head: [['Nome', 'Tipo', 'Dias', 'Data início', 'Aprovação', 'Situação do período', 'Turno']],
-    body: linhasParcelas,
-    styles: { fontSize: 8, cellPadding: 4 },
-    headStyles: { fillColor: [255, 138, 61], textColor: 255 },
-    margin: { left: 30, right: 30 },
-    didParseCell: (data) => {
-      if(data.section === 'body' && data.column.index === 1){
-        const v = data.cell.raw;
-        if(v === 'Já gozado' || v.startsWith('Já gozado')) data.cell.styles.textColor = [26, 138, 74];
-        else if(v === 'Em curso') data.cell.styles.textColor = [255, 138, 61];
-        else if(v === 'Planejado') data.cell.styles.textColor = [77, 158, 255];
-      }
-    }
-  });
+  let y = 112;
+  function tabelaCategoria(titulo, corRGB, linhas, cabecalho){
+    if(linhas.length === 0) return;
+    doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(...corRGB);
+    doc.text(`${titulo} (${linhas.length})`, 30, y);
+    doc.setTextColor(0);
+    doc.autoTable({
+      startY: y + 8,
+      head: [cabecalho],
+      body: linhas,
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: corRGB, textColor: 255 },
+      margin: { left: 30, right: 30 }
+    });
+    y = doc.lastAutoTable.finalY + 26;
+  }
 
-  const yFinal = doc.lastAutoTable.finalY + 24;
-  doc.setFontSize(12); doc.setFont(undefined, 'bold');
-  doc.text('Em alerta — 2º período próximo de também vencer', 30, yFinal);
+  const cabecalhoParcela = ['Nome', 'Dias', 'Data início', 'Tipo', 'Situação do período', 'Turno'];
+  tabelaCategoria('✅ Aprovadas', [26, 138, 74], aprovadas, cabecalhoParcela);
+  tabelaCategoria('🕓 Aguardando RH', [77, 158, 255], aguardando, cabecalhoParcela);
+  tabelaCategoria('⚠️ Sem status', [244, 196, 48], semStatus, cabecalhoParcela);
+  tabelaCategoria('📁 Já gozado (histórico)', [130, 130, 130], jaGozadas, ['Nome', 'Dias', 'Data da parcela', 'Encerrado em', 'Turno']);
+
+  doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(200, 60, 60);
+  doc.text(`⏳ Em alerta — 2º período próximo de também vencer (${linhasAlerta.length})`, 30, y);
+  doc.setTextColor(0);
   doc.autoTable({
-    startY: yFinal + 8,
+    startY: y + 8,
     head: [['Nome', 'Próx. vencimento', 'Dias restantes']],
     body: linhasAlerta.length ? linhasAlerta : [['Ninguém em alerta no momento.', '', '']],
     styles: { fontSize: 8, cellPadding: 4 },
@@ -2434,7 +2458,6 @@ async function exportarPDF(){
   });
   if(salvouPdf) toast('PDF gerado');
 }
-function escapeHtmlPdf(s){ return String(s); }
 
 // ---------- Importar: texto colado ----------
 function parseDataBr(str){
