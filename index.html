@@ -74,7 +74,7 @@
     padding:4px 10px; font-size:.7rem; color:var(--ink); white-space:nowrap;
   }
   .pizza-nome-linha{
-    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;
     background:var(--panel); border:1px solid var(--line); border-radius:8px;
     padding:6px 9px; font-size:.72rem; width:100%;
   }
@@ -113,7 +113,7 @@
     background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
     padding:10px 11px; margin-bottom:8px;
   }
-  .gerenciar-topo{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .gerenciar-topo{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;}
   .gerenciar-nome{font-weight:700; font-size:.85rem;}
   .gerenciar-campos{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;}
   .gerenciar-campo{display:flex; flex-direction:column; gap:3px;}
@@ -193,7 +193,7 @@
   .aprov-btn{font-size:.68rem; padding:5px 9px; border-radius:20px; border:1px solid var(--line); background:transparent; color:var(--ink-dim); cursor:pointer;}
   .aprov-btn.on.aguardando{border-color:var(--azul); color:var(--azul); background:rgba(77,158,255,.1);}
   .aprov-btn.on.aprovada{border-color:var(--roxo); color:var(--roxo); background:rgba(176,124,255,.1);}
-  .card-bottom-actions{display:flex; gap:6px;}
+  .card-bottom-actions{display:flex; gap:6px; flex-wrap:wrap;}
   .link-btn{background:none; border:none; color:var(--ink-dim); font-size:.68rem; text-decoration:underline; cursor:pointer; padding:6px 2px;}
   .link-btn:hover{color:var(--accent);}
   .link-btn[disabled]{opacity:.35; cursor:not-allowed; text-decoration:none;}
@@ -269,7 +269,7 @@
     padding:1px 8px;
   }
   .dash-row{
-    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
     background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--line); border-radius:8px;
     padding:10px 13px; margin-bottom:8px;
   }
@@ -989,8 +989,12 @@ function calcularStatus(c){
 
   let cor = 'green';
   if(!emAquisicao){
-    if(diasAteLimite <= 0) cor = 'red';
-    else if(diasRestantes <= thresholdAmarelo) cor = 'yellow';
+    // "Vencido" (vermelho) agora é reservado pra quem já tem 2+ períodos
+    // empilhados de verdade — o cenário mais crítico (maior risco de
+    // indenização em dobro). Um único período que passou do prazo legal, mas
+    // ainda não empilhou, vira "Atenção" — é sério, mas não é o pior caso.
+    if(ciclosAbertos >= 2) cor = 'red';
+    else if(diasAteLimite <= 0 || diasRestantes <= thresholdAmarelo) cor = 'yellow';
   }
 
   return {
@@ -1224,7 +1228,17 @@ function render(){
     const st = c.status;
     let pillTxt, pillClass;
     if(st.emAquisicao){ pillTxt = 'EM AQUISIÇÃO'; pillClass = 'aquisicao'; }
-    else if(st.diasAteLimite <= 0){ pillTxt = `VENCIDO HÁ ${Math.abs(st.diasAteLimite)}D`; pillClass = st.cor; }
+    else if(st.cor === 'red'){
+      // Vermelho agora é só o caso mais crítico: 2+ períodos já empilhados.
+      pillTxt = st.diasAteLimite <= 0 ? `VENCIDO HÁ ${Math.abs(st.diasAteLimite)}D` : `${st.ciclosAbertos} PERÍODOS EMPILHADOS`;
+      pillClass = st.cor;
+    }
+    else if(st.diasAteLimite <= 0){
+      // Um único período que já passou do prazo, mas ainda não empilhou —
+      // sério, mas não é mais o pior caso, por isso fica em Atenção (amarelo).
+      pillTxt = `ATENÇÃO — ${Math.abs(st.diasAteLimite)}D DE ATRASO`;
+      pillClass = st.cor;
+    }
     else if(st.eventoMaisProximo === 'proximoPeriodo'){
       pillTxt = st.diasParaProximoVencimento === 0 ? '2º PERÍODO VENCE HOJE' : `2º PERÍODO EM ${st.diasParaProximoVencimento}D`;
       pillClass = st.cor;
@@ -1590,30 +1604,38 @@ function calcularListasDashboard(){
   colaboradores.forEach(c => {
     (c.lancamentos || []).forEach(l => {
       if(l.status === 'aguardando') aguardando.push({ colaborador: c, parcela: l });
-      // "Aprovadas" só mostra quem ainda vai sair (ou já está) de férias — uma
-      // parcela aprovada cuja data já passou por completo não conta mais aqui,
-      // senão fica cheio de "período antigo" que já aconteceu de verdade.
-      if(l.status === 'aprovada' && l.dataPrevista){
-        const retornoParcela = addDays(parseISO(l.dataPrevista), l.dias);
-        if(retornoParcela >= hoje) aprovadas.push({ colaborador: c, parcela: l });
-      }
     });
-    // "Em férias" e "Próximas" só valem pra quem já foi aprovado pelo RH — e
-    // olham tanto nas parcelas em aberto quanto nas de períodos já encerrados
-    // (um fechamento automático pode ter levado uma parcela com data futura
-    // pro histórico, mas ela continua sendo uma férias real e programada).
-    const todasAprovadas = [
+    // "Aprovadas" (a aba/gráfico de status de aprovação) continua exigindo o
+    // status — aqui sim é sobre workflow, não sobre o fato de estar ou não de
+    // férias. Olha tanto nas parcelas em aberto quanto no histórico (um
+    // fechamento automático não pode fazer sumir quem ainda está de férias).
+    const candidatasAprovadas = [
       ...(c.lancamentos || []).filter(l => l.status === 'aprovada'),
       ...((c.historico || []).flatMap(h => (h.lancamentos || []).filter(l => l.status === 'aprovada')))
     ];
-    todasAprovadas.forEach(l => {
+    candidatasAprovadas.forEach(l => {
+      if(!l.dataPrevista) return;
+      const retornoParcela = addDays(parseISO(l.dataPrevista), l.dias);
+      if(retornoParcela >= hoje) aprovadas.push({ colaborador: c, parcela: l });
+    });
+
+    // "Em férias" é sobre um FATO (a pessoa está fora agora), não sobre status
+    // de aprovação — alguém pode estar fisicamente de férias mesmo com o RH
+    // ainda não tendo clicado em "Aprovar". Já "Próximas" é sobre planejamento
+    // futuro — aí sim só conta o que já foi confirmado (aprovado), senão vira
+    // uma lista cheia de coisa que ainda pode nem acontecer.
+    const todasParcelas = [
+      ...(c.lancamentos || []),
+      ...((c.historico || []).flatMap(h => h.lancamentos || []))
+    ];
+    todasParcelas.forEach(l => {
       if(!l.dataPrevista) return;
       const inicio = parseISO(l.dataPrevista);
       const retorno = addDays(inicio, l.dias);
       if(retorno < hoje) return;
-      const item = { colaborador: c, inicio, retorno, dias: l.dias };
+      const item = { colaborador: c, inicio, retorno, dias: l.dias, status: l.status };
       if(inicio <= hoje) emFerias.push(item);
-      else proximas.push(item);
+      else if(l.status === 'aprovada') proximas.push(item);
     });
   });
   emFerias.sort((a,b) => a.retorno - b.retorno);
@@ -1648,7 +1670,11 @@ function calcularAlertas(){
     const alertaMultiplo = st.ciclosAbertos >= 2;
     const alertaProximoVenc = !st.emAquisicao && !alertaMultiplo && st.diasParaProximoVencimento !== null
       && st.diasParaProximoVencimento >= 0 && st.diasParaProximoVencimento <= regras.alertaSegundoPeriodoDias;
-    if(alertaProximoVenc) lista.push({ colaborador: c, dias: st.diasParaProximoVencimento, proxVencimento: addMonths(st.inicioAcumulo, 12) });
+    // Se a pessoa já tem alguma parcela lançada pro período atual (programada,
+    // aguardando ou aprovada — não importa o status), o risco de empilhar já
+    // está sendo tratado, então não faz sentido continuar alertando.
+    const jaTemAlgoProgramado = (c.lancamentos || []).length > 0;
+    if(alertaProximoVenc && !jaTemAlgoProgramado) lista.push({ colaborador: c, dias: st.diasParaProximoVencimento, proxVencimento: addMonths(st.inicioAcumulo, 12) });
   });
   lista.sort((a,b) => a.dias - b.dias);
   return lista;
@@ -2437,26 +2463,53 @@ async function exportarPDF(){
   // nunca ficam incoerentes com o que aparece na página. Períodos já fechados
   // (histórico) ficam de fora de propósito — este relatório é um retrato do
   // momento atual, não um histórico (isso já existe na exportação em Excel).
-  const aprovadas = [], aguardando = [], semStatus = [];
+  const aprovadas = [], aguardando = [], semStatus = [], emFerias = [];
 
   colaboradores.forEach(c => {
     const st = calcularStatus(c);
     const situacao = st.emAquisicao ? 'Em aquisição' : (st.cor === 'red' ? 'Vencido' : (st.cor === 'yellow' ? 'Atenção' : 'Em dia'));
 
-    (c.lancamentos || []).forEach(l => {
+    // Olha tanto nas parcelas em aberto quanto nas de qualquer período já
+    // encerrado — um fechamento automático (por aprovação completar o ciclo)
+    // não pode fazer alguém que ESTÁ de férias hoje sumir do retrato atual.
+    // Do histórico só interessa o que ainda está em curso agora; o que já
+    // terminou de vez continua de fora, como já era.
+    const parcelasEmAberto = (c.lancamentos || []).map(l => ({ ...l, deHistorico: false }));
+    const parcelasHistorico = (c.historico || []).flatMap(h => (h.lancamentos || []).map(l => ({ ...l, deHistorico: true })));
+
+    [...parcelasEmAberto, ...parcelasHistorico].forEach(l => {
       const inicio = parseISO(l.dataPrevista);
       const retorno = addDays(inicio, l.dias);
       const tipo = retorno <= hojeRef ? 'Já gozado (aguard. encerramento)' : (inicio <= hojeRef ? 'Em curso' : 'Agendado');
+      if(l.deHistorico && tipo !== 'Em curso') return; // do histórico, só o que está acontecendo agora
+
+      const statusTxt = l.status === 'aprovada' ? 'Aprovada' : (l.status === 'aguardando' ? 'Aguardando RH' : 'Aguardando agendamento WorkForce');
       const linha = [c.nome, `${fmtDias(l.dias)}d`, fmtData(inicio), tipo, situacao, c.turno || '—'];
-      // "Aprovadas" só lista quem ainda vai sair (ou já está) de férias — um
-      // período aprovado que já terminou de vez não entra mais aqui.
+      // "Aprovadas" lista todo mundo já aprovado que ainda vai sair (ou já
+      // está) de férias — ordenada por data de início, pra dar pra enxergar a
+      // SEQUÊNCIA de quem sai a seguir, um após o outro. Um período aprovado
+      // que já terminou de vez não entra mais aqui.
       if(l.status === 'aprovada'){
-        if(tipo !== 'Já gozado (aguard. encerramento)') aprovadas.push(linha);
+        if(tipo !== 'Já gozado (aguard. encerramento)') aprovadas.push({ ordem: inicio, linha });
       }
       else if(l.status === 'aguardando') aguardando.push(linha);
       else semStatus.push(linha);
+
+      // "Em férias agora" é uma pergunta à parte (quando, não status de
+      // aprovação) — quem está em curso hoje entra aqui, com o status ao lado.
+      if(tipo === 'Em curso'){
+        emFerias.push({ ordem: retorno, linha: [c.nome, `${fmtDias(l.dias)}d`, fmtData(inicio), fmtData(retorno), statusTxt, c.turno || '—'] });
+      }
     });
   });
+
+  // Ordena por data — assim a primeira linha depois de "hoje" é literalmente
+  // quem sai a seguir, e "em férias" mostra primeiro quem retorna mais cedo
+  // (abrindo vaga pro próximo da fila).
+  aprovadas.sort((a,b) => a.ordem - b.ordem);
+  emFerias.sort((a,b) => a.ordem - b.ordem);
+  const aprovadasOrdenadas = aprovadas.map(a => a.linha);
+  const emFeriasOrdenadas = emFerias.map(a => a.linha);
 
   const linhasAlerta = alertas.map(a => [a.colaborador.nome, fmtData(a.proxVencimento), `${a.dias}d`]);
 
@@ -2469,9 +2522,8 @@ async function exportarPDF(){
   doc.text(`Gerado em ${fmtData(hoje)} às ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} · ${colaboradores.length} colaborador(es)`, 30, 46);
   doc.setTextColor(0);
 
-  const totalProgramadas = aprovadas.length + aguardando.length + semStatus.length;
   const kpis = [
-    ['Programadas (parcelas em aberto)', totalProgramadas], ['Aprovadas', aprovadas.length],
+    ['Em férias agora', emFerias.length], ['Aprovadas', aprovadas.length],
     ['Aguardando RH', aguardando.length], ['Aguard. WorkForce', semStatus.length], ['Em alerta', alertas.length]
   ];
   let xKpi = 30;
@@ -2503,7 +2555,8 @@ async function exportarPDF(){
   }
 
   const cabecalhoParcela = ['Nome', 'Dias', 'Data início', 'Tipo', 'Situação do período', 'Turno'];
-  tabelaCategoria('Aprovadas', [26, 138, 74], aprovadas, cabecalhoParcela);
+  tabelaCategoria('Em férias agora', [130, 90, 200], emFeriasOrdenadas, ['Nome', 'Dias', 'Saída', 'Retorno', 'Status', 'Turno']);
+  tabelaCategoria('Aprovadas — em ordem de saída', [26, 138, 74], aprovadasOrdenadas, cabecalhoParcela);
   tabelaCategoria('Aguardando RH', [77, 158, 255], aguardando, cabecalhoParcela);
   tabelaCategoria('Aguardando agendamento WorkForce', [244, 196, 48], semStatus, cabecalhoParcela);
 
