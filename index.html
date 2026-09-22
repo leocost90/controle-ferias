@@ -348,7 +348,6 @@
   <button class="dash-mini-chip emferias" data-tab="emferias"><span class="dash-mini-n" id="miniCntEmFerias">0</span> Em férias</button>
   <button class="dash-mini-chip programada" data-tab="proximas"><span class="dash-mini-n" id="miniCntProgramada">0</span> Próximas</button>
   <button class="dash-mini-chip aguardando" data-tab="aguardando"><span class="dash-mini-n" id="miniCntAguardando">0</span> Aguardando RH</button>
-  <button class="dash-mini-chip aprovada" data-tab="aprovada"><span class="dash-mini-n" id="miniCntAprovada">0</span> Aprovadas</button>
 </div>
 
 <div class="summary" id="summary">
@@ -694,14 +693,6 @@
           <div class="pizza-titulo">🕓 Aguardando RH</div>
           <div class="pizza-sub" id="pizzaSubAguardando">0 de 0 programadas</div>
           <div class="pizza-nomes" id="pizzaNomesAguardando"></div>
-        </div>
-      </div>
-      <div class="pizza-linha">
-        <div class="pizza-svg-wrap"><svg id="pizzaAprovada" viewBox="0 0 36 36" class="pizza-svg"></svg><div class="pizza-pct" id="pizzaPctAprovada">0%</div></div>
-        <div class="pizza-detalhes">
-          <div class="pizza-titulo">✅ Aprovadas</div>
-          <div class="pizza-sub" id="pizzaSubAprovada">0 de 0 programadas</div>
-          <div class="pizza-nomes" id="pizzaNomesAprovada"></div>
         </div>
       </div>
       <div class="pizza-linha">
@@ -1598,25 +1589,11 @@ function addDays(date, dias){
 function calcularListasDashboard(){
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const aguardando = [];
-  const aprovadas = [];
   const emFerias = [];
   const proximas = [];
   colaboradores.forEach(c => {
     (c.lancamentos || []).forEach(l => {
       if(l.status === 'aguardando') aguardando.push({ colaborador: c, parcela: l });
-    });
-    // "Aprovadas" (a aba/gráfico de status de aprovação) continua exigindo o
-    // status — aqui sim é sobre workflow, não sobre o fato de estar ou não de
-    // férias. Olha tanto nas parcelas em aberto quanto no histórico (um
-    // fechamento automático não pode fazer sumir quem ainda está de férias).
-    const candidatasAprovadas = [
-      ...(c.lancamentos || []).filter(l => l.status === 'aprovada'),
-      ...((c.historico || []).flatMap(h => (h.lancamentos || []).filter(l => l.status === 'aprovada')))
-    ];
-    candidatasAprovadas.forEach(l => {
-      if(!l.dataPrevista) return;
-      const retornoParcela = addDays(parseISO(l.dataPrevista), l.dias);
-      if(retornoParcela >= hoje) aprovadas.push({ colaborador: c, parcela: l });
     });
 
     // "Em férias" é sobre um FATO (a pessoa está fora agora), não sobre status
@@ -1641,15 +1618,14 @@ function calcularListasDashboard(){
   emFerias.sort((a,b) => a.retorno - b.retorno);
   proximas.sort((a,b) => a.inicio - b.inicio);
 
-  return { hoje, aguardando, aprovadas, emFerias, proximas };
+  return { hoje, aguardando, emFerias, proximas };
 }
 
 function atualizarMiniChips(){
-  const { aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  const { aguardando, emFerias, proximas } = calcularListasDashboard();
   $('miniCntEmFerias').textContent = emFerias.length;
   $('miniCntProgramada').textContent = proximas.length;
   $('miniCntAguardando').textContent = aguardando.length;
-  $('miniCntAprovada').textContent = aprovadas.length;
 }
 
 function linhaStatusDash(item, corClasse, comAcoes){
@@ -1682,19 +1658,17 @@ function calcularAlertas(){
 
 function calcularMetricasPizza(){
   const total = colaboradores.length;
-  const { aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  const { aguardando, emFerias, proximas } = calcularListasDashboard();
 
   // "Em férias": pessoas únicas (não períodos) atualmente de férias.
   const idsEmFerias = new Set(emFerias.map(p => p.colaborador.id));
   const pctEmFerias = total > 0 ? (idsEmFerias.size / total * 100) : 0;
 
-  // Base para aguardando/aprovada = pessoas com alguma férias programada (em curso ou futura).
+  // Base para aguardando = pessoas com alguma férias programada (em curso ou futura).
   const idsProgramadas = new Set([...emFerias, ...proximas].map(p => p.colaborador.id));
   const totalProgramadas = idsProgramadas.size;
   const aguardandoCount = aguardando.filter(item => idsProgramadas.has(item.colaborador.id)).length;
-  const aprovadaCount = aprovadas.filter(item => idsProgramadas.has(item.colaborador.id)).length;
   const pctAguardando = totalProgramadas > 0 ? (aguardandoCount / totalProgramadas * 100) : 0;
-  const pctAprovada = totalProgramadas > 0 ? (aprovadaCount / totalProgramadas * 100) : 0;
 
   const alertas = calcularAlertas();
   const pctAlerta = total > 0 ? (alertas.length / total * 100) : 0;
@@ -1702,7 +1676,6 @@ function calcularMetricasPizza(){
   return {
     total, emFeriasCount: idsEmFerias.size, pctEmFerias,
     totalProgramadas, aguardandoCount, pctAguardando,
-    aprovadaCount, pctAprovada,
     alertaCount: alertas.length, pctAlerta
   };
 }
@@ -1843,7 +1816,7 @@ function abrirDashboard(){
   $('dashTotalColaboradores').textContent = colaboradores.length;
 
   const m = calcularMetricasPizza();
-  const { aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  const { aguardando, emFerias, proximas } = calcularListasDashboard();
   const chipsNomes = (lista, vazio) => lista.length
     ? lista.map(nome => `<div class="pizza-nome-linha"><span>${escapeHtml(nome)}</span></div>`).join('')
     : `<span class="dash-empty">${vazio}</span>`;
@@ -1866,11 +1839,6 @@ function abrirDashboard(){
       </div>`).join('')
     : '<span class="dash-empty">Ninguém aguardando aprovação no momento.</span>';
 
-  renderPizza('pizzaAprovada', m.pctAprovada, '#b07cff');
-  $('pizzaPctAprovada').textContent = `${Math.round(m.pctAprovada)}%`;
-  $('pizzaSubAprovada').textContent = `${m.aprovadaCount} de ${m.totalProgramadas} programadas`;
-  $('pizzaNomesAprovada').innerHTML = chipsNomes(aprovadas.map(item => `${item.colaborador.nome} — ${fmtDias(item.parcela.dias)}d`), 'Nenhuma férias aprovada no momento.');
-
   renderPizza('pizzaAlerta', m.pctAlerta, '#f4c430');
   $('pizzaPctAlerta').textContent = `${Math.round(m.pctAlerta)}%`;
   $('pizzaSubAlerta').textContent = `${m.alertaCount} de ${m.total} pessoas`;
@@ -1888,7 +1856,7 @@ function abrirDashboard(){
 let dashExpTabAtual = 'emferias';
 
 function renderDashExpandido(){
-  const { hoje, aguardando, aprovadas, emFerias, proximas } = calcularListasDashboard();
+  const { hoje, aguardando, emFerias, proximas } = calcularListasDashboard();
   const cont = $('dashExpConteudo');
 
   if(dashExpTabAtual === 'emferias'){
@@ -1903,10 +1871,6 @@ function renderDashExpandido(){
     cont.innerHTML = aguardando.length
       ? aguardando.map(item => linhaStatusDash(item, 'b-aguardando', true)).join('')
       : '<div class="dash-empty">Ninguém aguardando aprovação no momento.</div>';
-  } else if(dashExpTabAtual === 'aprovada'){
-    cont.innerHTML = aprovadas.length
-      ? aprovadas.map(item => linhaStatusDash(item, 'b-aprovada', false)).join('')
-      : '<div class="dash-empty">Nenhuma férias aprovada no momento.</div>';
   } else if(dashExpTabAtual === 'alerta'){
     const alertas = calcularAlertas();
     cont.innerHTML = alertas.length
